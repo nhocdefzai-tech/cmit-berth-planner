@@ -1,18 +1,3 @@
-import os
-import subprocess
-import sys
-
-# Tự động kiểm tra và cài đặt openpyxl trực tiếp bằng lệnh hệ thống
-try:
-    import openpyxl
-except ImportError:
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
-    import openpyxl
-
-import streamlit as st
-import pandas as pd
-import json
-# ... (Các dòng import và code phía dưới của anh giữ nguyên nguyên vẹn)
 import streamlit as st
 import pandas as pd
 import datetime
