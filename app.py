@@ -200,6 +200,13 @@ all_active_barges = {**barge_summary, **st.session_state.custom_barges}
 
 # 4. GIAO DIỆN CHÍNH
 with tab_main:
+    col_print, col_title = st.columns([1, 5])
+    with col_print:
+        if st.button("🖨️ Xuất PDF"):
+                pdf_data = create_pdf(js_barges_list)
+                st.download_button("📥 Tải ngay", pdf_data, "CMIT_Report.pdf", "application/pdf")
+    
+    st.subheader("🗺️ SƠ ĐỒ SỐ HÓA CẦU BẾN CMIT")
     st.subheader("🗺️ SƠ ĐỒ SỐ HÓA CẦU BẾN CMIT KÉO THẢ PHÂN LUỒNG MẠN TÀU")
     st.caption("Băng Dưới: Sà lan cập cầu bến trực tiếp (Inner) | Băng Trên: Sà lan đậu ngoài cập mạn (Outer)")
     
@@ -236,7 +243,7 @@ with tab_main:
 
     # Đóng gói cấu trúc dữ liệu đẩy xuống Javascript xử lý đồ họa
     js_barges_list = []
-    
+       
     # Xử lý sà lan cập cầu (Inner - Băng dưới)
     for name in selected_inner:
         if name in all_active_barges:
@@ -413,14 +420,17 @@ with tab_main:
     st.write("---")
     st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)")
     
-    # Hiển thị log xe ngoài từ biến truck_summary
-    if 'truck_summary' in locals() and truck_summary:
-        for t_name, t_info in truck_summary.items():
-            with st.expander(f"🚛 XE: {t_info['vessel_name']} | Sản lượng: {t_info['total_moves']} Lượt"):
-                st.write(f"- Tổng TEUs: {t_info['total_teus']}")
-                st.write(f"- Thời gian: {t_info['first_move'].strftime('%H:%M')} đến {t_info['last_move'].strftime('%H:%M')}")
+    # --- TỔNG HỢP XE NGOÀI GOM NHÓM ---
+    st.write("---")
+    st.subheader("🚛 KHU VỰC XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)")
+    
+    if truck_summary:
+        # Gom nhóm toàn bộ xe vào 1 Expander chính
+        with st.expander(f"📦 Nhấn để xem danh sách {len(truck_summary)} xe đầu kéo ngoài"):
+            for t_name, t_info in truck_summary.items():
+                st.markdown(f"**{t_info['vessel_name']}**: {t_info['total_moves']} lượt | {t_info['total_teus']} TEUs")
     else:
-        st.info("Không có dữ liệu xe đầu kéo ngoài trong ca hiện tại.")
+        st.info("Không có dữ liệu xe ngoài.")
 
     # Nút xuất PDF
     if st.button("🖨️ Xuất sơ đồ hiện tại ra PDF"):
