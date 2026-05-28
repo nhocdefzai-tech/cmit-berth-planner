@@ -207,8 +207,7 @@ with tab_main:
                 st.download_button("📥 Tải ngay", pdf_data, "CMIT_Report.pdf", "application/pdf")
     
     st.subheader("🗺️ SƠ ĐỒ SỐ HÓA CẦU BẾN CMIT")
-    st.subheader("🗺️ SƠ ĐỒ SỐ HÓA CẦU BẾN CMIT KÉO THẢ PHÂN LUỒNG MẠN TÀU")
-    st.caption("Băng Dưới: Sà lan cập cầu bến trực tiếp (Inner) | Băng Trên: Sà lan đậu ngoài cập mạn (Outer)")
+    st.caption("Băng Dưới: Sà lan cập cầu bến trực tiếp (Inner)       |       Băng Trên: Sà lan đậu ngoài cập mạn (Outer)")
     
     # Hàm định dạng nhãn hiển thị kèm thông số trong danh sách xổ xuống
     def format_barge_label(barge_name):
