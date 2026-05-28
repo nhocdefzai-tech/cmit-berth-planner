@@ -448,15 +448,45 @@ with tab_main:
     # 7. KHÔI PHỤC HOÀN TOÀN KHU VỰC XE ĐẦU KÉO NGOÀI TRONG CA
     # =====================================================================
     st.write("---")
-    st.subheader("🚛 KHU VỰC XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)")
-    
-    if truck_summary:
-        # Gom nhóm toàn bộ xe vào 1 Expander chính
-        with st.expander(f"📦 Nhấn để xem danh sách {len(truck_summary)} xe đầu kéo ngoài"):
-            for t_name, t_info in truck_summary.items():
-                st.markdown(f"**{t_info['vessel_name']}**: {t_info['total_moves']} lượt | {t_info['total_teus']} TEUs")
+st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS LOG)")
+
+if truck_summary:
+    # 1. Chuẩn bị dữ liệu
+    truck_data = []
+    for t_name, t_info in truck_summary.items():
+        truck_data.append({
+            "Mã Xe": t_name,
+            "Số Lượt": t_info['total_moves'],
+            "Tổng TEUs": t_info['total_teus'],
+            "Thời điểm đầu": t_info['first_move'].strftime('%H:%M'),
+            "Thời điểm cuối": t_info['last_move'].strftime('%H:%M')
+        })
+    df_trucks = pd.DataFrame(truck_data)
+    st.dataframe(df_trucks, use_container_width=True, hide_index=True)
+
+    # 2. Tạo lựa chọn định dạng
+    format_choice = st.radio("Chọn định dạng file tải về:", ("CSV", "Excel"), horizontal=True)
+
+    if format_choice == "CSV":
+        csv_data = df_trucks.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Tải xuống CSV",
+            data=csv_data,
+            file_name="danh_sach_xe.csv",
+            mime="text/csv"
+        )
     else:
-        st.info("Không có dữ liệu xe ngoài.")
+        # Cần thư viện io để lưu file Excel vào bộ nhớ
+        import io
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+            df_trucks.to_excel(writer, index=False, sheet_name='Trucks')
+        
+        st.download_button(
+            label="📥 Tải xuống Excel",
+            data=buffer.getvalue(),
+            file_name="danh_sach_xe.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 # Tự động đồng bộ làm mới trang sau mỗi 30 giây
 st.components.v1.html(
