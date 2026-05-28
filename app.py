@@ -455,7 +455,6 @@ with tab_main:
             win.print();
         }
         </script>
-    """, unsafe_allow_html=True)
 
     if st.button("🖨️ Xuất sơ đồ hiện tại ra PDF"):
         st.markdown('<script>printBerth();</script>', unsafe_allow_html=True)   
