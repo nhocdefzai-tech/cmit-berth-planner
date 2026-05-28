@@ -35,6 +35,9 @@ st.sidebar.subheader(f"{total_delay_mins} phút")
 # =====================================================================
 # 3. ĐỌC VÀ XỬ LÝ DỮ LIỆU GỐC (TỐI ƯU HÓA)
 # =====================================================================
+# Bắt buộc khởi tạo biến trước khi đọc file
+barge_summary = {}
+truck_summary = {}
 try:
     df_raw = pd.read_excel(file_path, skiprows=4)
     df_raw.columns = df_raw.columns.str.strip()
@@ -365,22 +368,20 @@ st.write("---")
 st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)")
 
 if truck_summary:
-    # 1. Chuẩn bị dữ liệu dạng bảng
+    # 1. Chuẩn bị dữ liệu dạng bảng sạch sẽ
     truck_data = []
-    # Trong phần hiển thị xe đầu kéo
-for t_name, t_info in truck_summary.items():
-    # Sử dụng .get() để an toàn nếu thiếu key
-    st.write(f"{t_name}: {t_info.get('total_moves', 0)} lượt | {t_info.get('total_teus', 0)} TEUs")
+    for t_name, t_info in truck_summary.items():
         truck_data.append({
             "Mã Xe": t_name,
-            "Số Lượt": t_info['total_moves'],
-            "Tổng TEUs": t_info['total_teus'],
-            "Thời điểm đầu": t_info['first_move'].strftime('%H:%M'),
-            "Thời điểm cuối": t_info['last_move'].strftime('%H:%M')
+            "Số Lượt": t_info.get('total_moves', 0),
+            "Tổng TEUs": t_info.get('total_teus', 0),
+            "Thời điểm đầu": t_info['first_move'].strftime('%H:%M') if isinstance(t_info['first_move'], datetime.datetime) else "N/A",
+            "Thời điểm cuối": t_info['last_move'].strftime('%H:%M') if isinstance(t_info['last_move'], datetime.datetime) else "N/A"
         })
+    
     df_trucks = pd.DataFrame(truck_data)
     
-    # 2. Hiển thị bảng
+    # 2. Hiển thị bảng duy nhất
     st.dataframe(df_trucks, use_container_width=True, hide_index=True)
 
     # 3. Chọn định dạng tải về
@@ -392,6 +393,7 @@ for t_name, t_info in truck_summary.items():
     else:
         import io
         buffer = io.BytesIO()
+        # Sử dụng engine xlsxwriter (đảm bảo đã cài đặt trong requirements.txt)
         with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
             df_trucks.to_excel(writer, index=False, sheet_name='Trucks')
         st.download_button(
