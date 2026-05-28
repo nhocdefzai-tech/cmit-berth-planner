@@ -35,63 +35,49 @@ st.sidebar.subheader(f"{total_delay_mins} phút")
 # =====================================================================
 # 3. ĐỌC VÀ XỬ LÝ DỮ LIỆU GỐC (TỐI ƯU HÓA)
 # =====================================================================
-# Bắt buộc khởi tạo biến trước khi đọc file
-st.sidebar.header("📂 TẢI DỮ LIỆU LÊN")
+# [PHẦN ĐỌC FILE - THAY THẾ ĐOẠN CŨ CỦA BẠN]
 uploaded_file = st.sidebar.file_uploader("Chọn file Excel báo cáo:", type=["xlsx"])
 barge_summary = {}
 truck_summary = {}
+
 if uploaded_file is not None:
     try:
-        # Đọc file và tự động xử lý khoảng trắng tên cột
-        df_raw = pd.read_excel(file_path, skiprows=4)
+        # Đọc trực tiếp từ object uploaded_file
+        df_raw = pd.read_excel(uploaded_file, skiprows=4)
         df_raw.columns = df_raw.columns.str.strip()
-    
-        # KIỂM TRA CỘT BẮT BUỘC (tránh lỗi 'Time_DT')
+        
         required_cols = ['Carrier Visit', 'Time_DT', 'TEU', 'Move Kind']
-        if not all(col in df_raw.columns for col in required_cols):
-            st.error(f"File thiếu cột bắt buộc. Cần có: {required_cols}")
+        if all(col in df_raw.columns for col in required_cols):
+            # Hàm clean giữ nguyên
+            def clean_carrier_name(name):
+                s = str(name).strip().upper()
+                while s.endswith('L') and len(s) > 4: s = s[:-1]
+                return s
+            
+            for carrier, group in df_raw.groupby('Carrier Visit'):
+                norm_name = clean_carrier_name(carrier)
+                if "GATE" in norm_name or "INFO" in norm_name or pd.isna(carrier): continue
+                
+                data_template = {
+                    "vessel_name": norm_name, "total_moves": 0, "total_teus": 0,
+                    "first_move": group['Time_DT'].min(), "last_move": group['Time_DT'].max()
+                }
+                
+                if norm_name[0].isdigit(): # Xe
+                    if norm_name not in truck_summary: truck_summary[norm_name] = data_template.copy()
+                    truck_summary[norm_name]['total_moves'] += len(group)
+                    truck_summary[norm_name]['total_teus'] += int(group['TEU'].sum())
+                else: # Sà lan
+                    if norm_name not in barge_summary: barge_summary[norm_name] = data_template.copy()
+                    moves_df = group[group['Move Kind'].isin(['Load', 'Discharge', 'Sling', 'Restow'])]
+                    barge_summary[norm_name]['total_moves'] += len(moves_df)
+                    barge_summary[norm_name]['total_teus'] += int(group['TEU'].sum())
+            
+            st.success("✅ Phân tích thành công!")
         else:
-        
-        # Khai báo biến global tránh lỗi
-        if 'total_delay_mins' not in locals(): total_delay_mins = 0
-        
-        # Chuẩn hóa tên Carrier
-        def clean_carrier_name(name):
-            s = str(name).strip().upper()
-            # Loại bỏ các ký tự L ở cuối nếu là chữ cái
-            while s.endswith('L') and len(s) > 4:
-                s = s[:-1]
-            return s
-    
-        for carrier, group in df_raw.groupby('Carrier Visit'):
-            norm_name = clean_carrier_name(carrier)
-            if "GATE" in norm_name or "INFO" in norm_name or pd.isna(carrier): continue
-            
-            # Cấu trúc dữ liệu chuẩn
-            data_template = {
-                "vessel_name": norm_name, "total_moves": 0, "total_teus": 0,
-                "first_move": group['Time_DT'].min(), "last_move": group['Time_DT'].max(),
-                "cranes": {}
-            }
-            
-            if norm_name[0].isdigit():
-                # Xử lý XE (Truck)
-                if norm_name not in truck_summary: truck_summary[norm_name] = data_template.copy()
-                truck_summary[norm_name]['total_moves'] += len(group)
-                truck_summary[norm_name]['total_teus'] += int(group['TEU'].sum() if 'TEU' in group.columns else 0)
-            else:
-                # Xử lý SÀ LAN (Barge)
-                if norm_name not in barge_summary: barge_summary[norm_name] = data_template.copy()
-                moves_df = group[group['Move Kind'].isin(['Load', 'Discharge', 'Sling', 'Restow'])]
-                barge_summary[norm_name]['total_moves'] += len(moves_df)
-                barge_summary[norm_name]['total_teus'] += int(group['TEU'].sum() if 'TEU' in group.columns else 0)
-                st.success("✅ Đã phân tích file thành công!")
-    
+            st.error("File thiếu cột bắt buộc.")
     except Exception as e:
-        st.error(f"❌ Lỗi xử lý: {e}")
-
-else:
-    st.info("👈 Hãy tải file Excel lên thanh Sidebar để bắt đầu phân tích.")
+        st.error(f"Lỗi: {e}")
 
 # Hàm tạo PDF
 def create_pdf(barge_data):
@@ -132,7 +118,6 @@ def get_js_barges_data(selected_inner, selected_outer):
     return data
 
 # 2. KHỞI TẠO TABS CHÍNH (Chỉ khai báo 1 lần)
-all_active_barges = {**barge_summary, **st.session_state.custom_barges}
 tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER & DASHBOARD", "⚙️ CONFIG BARGE SPEC"])
 
 with tab_config:
@@ -182,7 +167,8 @@ with tab_config:
         with col_b:
             if f"bay_{b_name}" not in st.session_state: st.session_state[f"bay_{b_name}"] = 4 
             barge_summary[b_name]['bays'] = st.number_input(f"Số lượng Bay - {b_name}:", min_value=1, max_value=5, key=f"bay_{b_name}")
-
+            
+all_active_barges = {**barge_summary, **st.session_state.custom_barges}
 # 4. GIAO DIỆN CHÍNH
 with tab_main:
     col_print, col_title = st.columns([1, 5])
