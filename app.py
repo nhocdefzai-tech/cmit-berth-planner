@@ -3,9 +3,8 @@ import pandas as pd
 import datetime
 import warnings
 import json
-from fpdf import FPDF
 
-# --- CẤU HÌNH ---
+# 1. --- CẤU HÌNH ---
 warnings.filterwarnings("ignore")
 st.set_page_config(layout="wide", page_title="CMIT Berthing Master")
 
@@ -13,18 +12,6 @@ if "custom_barges" not in st.session_state:
     st.session_state.custom_barges = {}
 
 st.title("🚢 CMIT - BERTH PLANNER & PERFORMANCE DASHBOARD")
-
-# --- HÀM TẠO PDF ---
-def create_pdf(barge_data):
-    pdf = FPDF(orientation='L', unit='mm', format='A4')
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, "BAO CAO SO DO CAU BEN CMIT", ln=True, align='C')
-    pdf.set_font("Arial", '', 12)
-    pdf.ln(10)
-    for item in barge_data:
-        pdf.cell(0, 10, f"- {item['name']}: {item['length']}m | {item['bays']} Bays | {item['position_type']}", ln=True)
-    return pdf.output(dest='S').encode('latin-1')
 
 # =====================================================================
 # 2. THANH SIDEBAR - QUẢN LÝ MÃ GIẢM TRỪ (DELAY 5X)
@@ -472,18 +459,31 @@ st.components.v1.html(
 tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER", "⚙️ CONFIG"])
 
 with tab_config:
-    st.write("Cấu hình sà lan tại đây...") # Dán code cấu hình của anh vào
+    st.subheader("⚙️ CẤU HÌNH SÀ LAN")
+    # [Dán phần code cấu hình Sà lan của anh tại đây]
 
 with tab_main:
-    # Dán toàn bộ code hiển thị sơ đồ và logic kéo thả của anh vào đây
+    st.subheader("🗺️ SƠ ĐỒ KÉO THẢ PHÂN LUỒNG")
     
-    # Nút xuất PDF đặt ở cuối tab_main
-    if 'js_barges_list' in locals():
-        if st.button("🖨️ Xuất sơ đồ ra PDF"):
-            pdf_data = create_pdf(js_barges_list)
-            st.download_button("📥 Tải file PDF", pdf_data, "CMIT_Report.pdf", "application/pdf")
-    else:
-        st.warning("Dữ liệu sà lan chưa sẵn sàng để xuất.")
+    # 1. Đoạn code hiển thị multiselect và Logic js_barges_list của anh
+    # [Dán phần logic chọn Inner/Outer và tạo js_barges_list tại đây]
 
+    # 2. Hệ thống xuất PDF (Sử dụng giải pháp chụp container)
+    st.markdown("""
+        <script>
+        function printBerth() {
+            var printContents = document.getElementById("berth-container").innerHTML;
+            var win = window.open('', '_blank', 'width=1000,height=600');
+            win.document.write('<html><head><title>CMIT Berth Plan</title></head><body>' + printContents + '</body></html>');
+            win.document.close();
+            win.print();
+        }
+        </script>
+    """, unsafe_allow_html=True)
+
+    if st.button("🖨️ Xuất sơ đồ hiện tại ra PDF (In trình duyệt)"):
+        st.markdown('<script>printBerth();</script>', unsafe_allow_html=True)
+        st.info("Trình duyệt sẽ mở cửa sổ in. Hãy chọn 'Lưu thành PDF' (Save as PDF).")
+        
 # Tự động refresh
 st.components.v1.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
