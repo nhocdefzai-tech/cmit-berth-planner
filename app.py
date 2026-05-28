@@ -419,43 +419,50 @@ with tab_main:
 st.write("---")
 st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)")
 
-if truck_summary:
-    # 1. Chuẩn bị dữ liệu dạng bảng sạch sẽ
-    truck_data = []
-    for t_name, t_info in truck_summary.items():
-        truck_data.append({
-            "Mã Xe": t_name,
-            "Số Lượt": t_info.get('total_moves', 0),
-            "Tổng TEUs": t_info.get('total_teus', 0),
-            "Thời điểm đầu": t_info['first_move'].strftime('%H:%M') if isinstance(t_info['first_move'], datetime.datetime) else "N/A",
-            "Thời điểm cuối": t_info['last_move'].strftime('%H:%M') if isinstance(t_info['last_move'], datetime.datetime) else "N/A"
-        })
-    
-    df_trucks = pd.DataFrame(truck_data)
-    
-    # 2. Hiển thị bảng duy nhất
-    st.dataframe(df_trucks, use_container_width=True, hide_index=True)
+if st.session_state.truck_summary:
 
-    # 3. Chọn định dạng tải về
-    format_choice = st.radio("Chọn định dạng file tải về:", ("CSV", "Excel"), horizontal=True, key="truck_dl_format")
-
-    if format_choice == "CSV":
-        csv_data = df_trucks.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Tải xuống CSV", csv_data, "danh_sach_xe.csv", "text/csv")
+    if truck_summary:
+        # 1. Chuẩn bị dữ liệu dạng bảng sạch sẽ
+        truck_data = []
+        for t_name, t_info in truck_summary.items():
+            truck_data.append({
+                "Mã Xe": t_name,
+                "Số Lượt": t_info.get('total_moves', 0),
+                "Tổng TEUs": t_info.get('total_teus', 0),
+                "Thời điểm đầu": t_info['first_move'].strftime('%H:%M') if isinstance(t_info['first_move'], datetime.datetime) else "N/A",
+                "Thời điểm cuối": t_info['last_move'].strftime('%H:%M') if isinstance(t_info['last_move'], datetime.datetime) else "N/A"
+            })
+        
+        df_trucks = pd.DataFrame(truck_data)
+        
+        # 2. Hiển thị bảng duy nhất
+        st.dataframe(df_trucks, use_container_width=True, hide_index=True)
+    
+        # 3. Chọn định dạng tải về
+        format_choice = st.radio("Chọn định dạng file tải về:", ("CSV", "Excel"), horizontal=True, key="truck_dl_format")
+    
+        if format_choice == "CSV":
+            csv_data = df_trucks.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Tải xuống CSV", csv_data, "danh_sach_xe.csv", "text/csv")
+        else:
+            import io
+            buffer = io.BytesIO()
+            # Sử dụng engine xlsxwriter (đảm bảo đã cài đặt trong requirements.txt)
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                df_trucks.to_excel(writer, index=False, sheet_name='Trucks')
+            st.download_button(
+                label="📥 Tải xuống Excel",
+                data=buffer.getvalue(),
+                file_name="danh_sach_xe.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
     else:
-        import io
-        buffer = io.BytesIO()
-        # Sử dụng engine xlsxwriter (đảm bảo đã cài đặt trong requirements.txt)
-        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-            df_trucks.to_excel(writer, index=False, sheet_name='Trucks')
-        st.download_button(
-            label="📥 Tải xuống Excel",
-            data=buffer.getvalue(),
-            file_name="danh_sach_xe.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        st.info("Không có dữ liệu xe đầu kéo trong ca hiện tại."
+               )
+        
 else:
-    st.info("Không có dữ liệu xe đầu kéo trong ca hiện tại.")
+    st.info("👈 Hãy tải file lên để hiển thị dữ liệu."
+           )
     
 # Tự động refresh (Đặt ở cuối cùng của file)
 components.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
