@@ -417,16 +417,13 @@ with tab_main:
     st.components.v1.html(html_code, height=255)
 
 # =====================================================================
-# 7. KHÔI PHỤC HOÀN TOÀN KHU VỰC XE ĐẦU KÉO NGOÀI TRONG CA
+# 7. KHÔI PHỤC HOÀN TOÀN KHU VỰC XE ĐẦU KÉO NGOÀI
 # =====================================================================
 st.write("---")
-st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS LOG)")
+st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)")
 
-# =====================================================================
-# PHẦN XUẤT FILE DANH SÁCH XE (CẬP NHẬT)
-# =====================================================================
 if truck_summary:
-    # 1. Chuẩn bị dữ liệu
+    # 1. Chuẩn bị dữ liệu dạng bảng
     truck_data = []
     for t_name, t_info in truck_summary.items():
         truck_data.append({
@@ -437,32 +434,29 @@ if truck_summary:
             "Thời điểm cuối": t_info['last_move'].strftime('%H:%M')
         })
     df_trucks = pd.DataFrame(truck_data)
+    
+    # 2. Hiển thị bảng
     st.dataframe(df_trucks, use_container_width=True, hide_index=True)
 
-    # 2. Tạo lựa chọn định dạng
-    format_choice = st.radio("Chọn định dạng file tải về:", ("CSV", "Excel"), horizontal=True)
+    # 3. Chọn định dạng tải về
+    format_choice = st.radio("Chọn định dạng file tải về:", ("CSV", "Excel"), horizontal=True, key="truck_dl_format")
 
     if format_choice == "CSV":
         csv_data = df_trucks.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Tải xuống CSV",
-            data=csv_data,
-            file_name="danh_sach_xe.csv",
-            mime="text/csv"
-        )
+        st.download_button("📥 Tải xuống CSV", csv_data, "danh_sach_xe.csv", "text/csv")
     else:
-        # Cần thư viện io để lưu file Excel vào bộ nhớ
         import io
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
             df_trucks.to_excel(writer, index=False, sheet_name='Trucks')
-        
         st.download_button(
             label="📥 Tải xuống Excel",
             data=buffer.getvalue(),
             file_name="danh_sach_xe.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
+else:
+    st.info("Không có dữ liệu xe đầu kéo trong ca hiện tại.")
+    
 # Tự động refresh (Đặt ở cuối cùng của file)
 components.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
