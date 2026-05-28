@@ -219,8 +219,6 @@ with tab_config:
                 "Tên Sà Lan (N4)": b_name,
                 "Chiều dài LOA (mét)": int(b_info['length']),
                 "Số lượng Bay (Bays)": int(b_info['bays']),
-                "Tổng Sản Lượng (Moves)": b_info['total_moves'],
-                "Tổng Sản Lượng (TEUs)": b_info['total_teus']
             })
             
         df_n4_editable = pd.DataFrame(n4_table_data)
