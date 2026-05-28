@@ -33,53 +33,45 @@ st.sidebar.markdown("### 📊 Tổng thời gian giảm trừ:")
 st.sidebar.subheader(f"{total_delay_mins} phút")
 
 # =====================================================================
-# 3. ĐỌC VÀ XỬ LÝ DỮ LIỆU GỐC (TỐI ƯU GOM NHÓM & KHẮC PHỤC LỖI)
+# 3. ĐỌC VÀ XỬ LÝ DỮ LIỆU GỐC (TỐI ƯU HÓA)
 # =====================================================================
-file_path = "MoveEvent_20260526_2203.xlsx"
-
-# Khai báo biến delay để tránh lỗi "not defined"
-total_delay_mins = 0 
-
-barge_summary = {}
-truck_summary = {}
-
 try:
     df_raw = pd.read_excel(file_path, skiprows=4)
     df_raw.columns = df_raw.columns.str.strip()
     
-    # Chuẩn hóa dữ liệu
-    df_raw['Time_Clean'] = df_raw['Time Completed'].astype(str).str.replace(":", "")
-    df_raw['Time_DT'] = pd.to_datetime(df_raw['Time_Clean'], format='%d-%b-%y %H%M', errors='coerce')
-    df_raw = df_raw.dropna(subset=['Time_DT', 'Carrier Visit'])
+    # Khai báo biến global tránh lỗi
+    if 'total_delay_mins' not in locals(): total_delay_mins = 0
     
-    # Lấy danh sách Carrier duy nhất sau khi đã loại bỏ đuôi 'L'
-    def get_norm_name(name):
-        s = str(name).strip()
-        # Nếu có đuôi L và độ dài > 4 thì cắt L, còn không thì giữ nguyên
-        return s[:-1] if (s.endswith('L') and len(s) > 4) else s
+    # Chuẩn hóa tên Carrier
+    def clean_carrier_name(name):
+        s = str(name).strip().upper()
+        # Loại bỏ các ký tự L ở cuối nếu là chữ cái
+        while s.endswith('L') and len(s) > 4:
+            s = s[:-1]
+        return s
 
     for carrier, group in df_raw.groupby('Carrier Visit'):
-        norm_name = get_norm_name(carrier)
-        if "GATE" in norm_name or "INFO" in norm_name or pd.isna(carrier):
-            continue
-            
+        norm_name = clean_carrier_name(carrier)
+        if "GATE" in norm_name or "INFO" in norm_name or pd.isna(carrier): continue
+        
+        # Cấu trúc dữ liệu chuẩn
+        data_template = {
+            "vessel_name": norm_name, "total_moves": 0, "total_teus": 0,
+            "first_move": group['Time_DT'].min(), "last_move": group['Time_DT'].max(),
+            "cranes": {}
+        }
+        
         if norm_name[0].isdigit():
-            # Gom nhóm XE
-            if norm_name not in truck_summary:
-                truck_summary[norm_name] = {"total_moves": 0, "first_move": group['Time_DT'].min(), "last_move": group['Time_DT'].max()}
+            # Xử lý XE (Truck)
+            if norm_name not in truck_summary: truck_summary[norm_name] = data_template.copy()
             truck_summary[norm_name]['total_moves'] += len(group)
-            truck_summary[norm_name]['first_move'] = min(truck_summary[norm_name]['first_move'], group['Time_DT'].min())
-            truck_summary[norm_name]['last_move'] = max(truck_summary[norm_name]['last_move'], group['Time_DT'].max())
+            truck_summary[norm_name]['total_teus'] += int(group['TEU'].sum() if 'TEU' in group.columns else 0)
         else:
-            # Gom nhóm SÀ LAN
-            if norm_name not in barge_summary:
-                barge_summary[norm_name] = {
-                    "vessel_name": norm_name, "total_moves": 0,
-                    "first_move": group['Time_DT'].min(), "last_move": group['Time_DT'].max()
-                }
-            barge_summary[norm_name]['total_moves'] += len(group)
-            barge_summary[norm_name]['first_move'] = min(barge_summary[norm_name]['first_move'], group['Time_DT'].min())
-            barge_summary[norm_name]['last_move'] = max(barge_summary[norm_name]['last_move'], group['Time_DT'].max())
+            # Xử lý SÀ LAN (Barge)
+            if norm_name not in barge_summary: barge_summary[norm_name] = data_template.copy()
+            moves_df = group[group['Move Kind'].isin(['Load', 'Discharge', 'Sling', 'Restow'])]
+            barge_summary[norm_name]['total_moves'] += len(moves_df)
+            barge_summary[norm_name]['total_teus'] += int(group['TEU'].sum() if 'TEU' in group.columns else 0)
 
 except Exception as e:
     st.error(f"❌ Lỗi xử lý: {e}")
@@ -375,7 +367,10 @@ st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)"
 if truck_summary:
     # 1. Chuẩn bị dữ liệu dạng bảng
     truck_data = []
-    for t_name, t_info in truck_summary.items():
+    # Trong phần hiển thị xe đầu kéo
+for t_name, t_info in truck_summary.items():
+    # Sử dụng .get() để an toàn nếu thiếu key
+    st.write(f"{t_name}: {t_info.get('total_moves', 0)} lượt | {t_info.get('total_teus', 0)} TEUs")
         truck_data.append({
             "Mã Xe": t_name,
             "Số Lượt": t_info['total_moves'],
