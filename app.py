@@ -3,6 +3,7 @@ import pandas as pd
 import datetime
 import warnings
 import json
+from fpdf import FPDF
 
 # 1. CẤU HÌNH
 warnings.filterwarnings("ignore")
@@ -135,10 +136,21 @@ except Exception as e:
     st.error(f"❌ Lỗi cấu trúc hoặc xử lý tệp tin Excel: {e}")
     st.stop()
 
-# 2. KHAI BÁO TABS DUY NHẤT
+# Hàm tạo PDF
+def create_pdf(barge_data):
+    pdf = FPDF(orientation='L', unit='mm', format='A4')
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 10, "BAO CAO SO DO CAU BEN CMIT", ln=True, align='C')
+    pdf.set_font("Arial", '', 12)
+    pdf.ln(10)
+    for item in barge_data:
+        pdf.cell(0, 10, f"- {item['name']}: {item['length']}m | {item['bays']} Bays | {item['position_type']}", ln=True)
+    return pdf.output(dest='S').encode('latin-1')
+
+# 2. GIAO DIỆN CHÍNH
 tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER & DASHBOARD", "⚙️ CONFIG BARGE SPEC"])
 
-# 3. GIAO DIỆN CẤU HÌNH
 with tab_config:
     st.subheader("⚙️ CẤU HÌNH THÔNG SỐ SÀ LAN")
     tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER & DASHBOARD", "⚙️ CONFIG BARGE SPEC (NHẬP THÔNG SỐ SÀ LAN)"])
@@ -265,7 +277,8 @@ with tab_main:
             <span style="font-size: 9px; font-weight: bold; color: #34495E; display: block; margin-top: 2px;">{label_display}</span>
         </div>
         """
-
+    
+    # Hệ thống nhúng HTML/JS (đảm bảo không bị sai thụt lề)
     # Kéo giãn chiều cao container lên 250px để chia làm 2 tầng hầm tàu
     html_code = f"""
     <div id="berth-container" style="position: relative; width: 100%; height: 240px; background-color: #F8F9FA; border: 2px solid #2C3E50; border-radius: 8px; margin-bottom: 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden;">
@@ -404,101 +417,16 @@ with tab_main:
 
     st.components.v1.html(html_code, height=255)
 
-    # =====================================================================
-    # 6. HIỂN THỊ DANH SÁCH CHI TIẾT THEO PHÂN LUỒNG
-    # =====================================================================
-    st.subheader("📋 CHI TIẾT SÀ LAN ĐANG BIỂU DIỄN TRÊN SƠ ĐỒ")
-    
-    # Hiển thị sà lan cập cầu
-    if selected_inner:
-        st.markdown("🔹 **Danh sách sà lan đang đậu tại Cầu (Inner):**")
-        for name in selected_inner:
-            if name in all_active_barges:
-                b_info = all_active_barges[name]
-                is_cb = b_info.get('is_custom', False)
-                with st.expander(f"⚓ [CẦU] {b_info['vessel_name']} ➔ LOA: {b_info['length']}m | {b_info['bays']} Bays | GMPH: {b_info['gmph']}", expanded=False):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if is_cb: st.info("💡 Sà lan kế hoạch thêm thủ công bằng tay.")
-                        else: st.markdown(f"* ⏱ **Thời gian làm:** {b_info['first_move'].strftime('%H:%M')} ➔ {b_info['last_move'].strftime('%H:%M')}\n* 📦 **Sản lượng:** `{b_info['total_teus']}` TEU")
-                    with col2:
-                        st.markdown(f"* 📐 **LOA:** `{b_info['length']}` m\n* 📊 **Hầm hàng:** `{b_info['bays']}` Bays\n* 📈 **NMPH:** `{b_info['nmph']}`")
-                    if not is_cb and b_info['cranes']:
-                        crane_table = [{"Mã Cẩu QC": q_name, "Sản lượng (Moves)": q_data['moves'], "Năng suất (GMPH)": q_data['gmph'], "Khung giờ làm": q_data['timeline']} for q_name, q_data in b_info['cranes'].items()]
-                        st.dataframe(pd.DataFrame(crane_table), use_container_width=True, hide_index=True)
-
-    # Hiển thị sà lan cập mạn
-    if selected_outer:
-        st.markdown("🔹 **Danh sách sà lan đang đậu Cập Mạn tàu khác (Outer):**")
-        for name in selected_outer:
-            if name in all_active_barges:
-                b_info = all_active_barges[name]
-                is_cb = b_info.get('is_custom', False)
-                with st.expander(f"⛓️ [CẬP MẠN] {b_info['vessel_name']} ➔ LOA: {b_info['length']}m | {b_info['bays']} Bays", expanded=False):
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if is_cb: st.info("💡 Sà lan cập mạn bổ sung ngoài kế hoạch.")
-                        else: st.markdown(f"* ⏱ **Thời gian làm:** {b_info['first_move'].strftime('%H:%M')} ➔ {b_info['last_move'].strftime('%H:%M')}\n* 📦 **Sản lượng:** `{b_info['total_teus']}` TEU")
-                    with col2:
-                        st.markdown(f"* 📐 **LOA:** `{b_info['length']}` m\n* 📊 **Hầm hàng:** `{b_info['bays']}` Bays")
-
-    if not selected_inner and not selected_outer:
-        st.info("Vui lòng lựa chọn sà lan từ hai hộp chọn phía trên để bắt đầu lập sơ đồ.")
-
-# Nút xuất PDF
-        <script>
-        function printBerth() {
-            var printContents = document.getElementById("berth-container").innerHTML;
-            var win = window.open('', '_blank', 'width=1000,height=600');
-            win.document.write('<html><head><title>CMIT Berth Plan</title></head><body>' + printContents + '</body></html>');
-            win.document.close();
-            win.print();
-        }
-        </script>
-
+    # 3. NÚT XUẤT PDF
     if st.button("🖨️ Xuất sơ đồ hiện tại ra PDF"):
-        st.markdown('<script>printBerth();</script>', unsafe_allow_html=True)   
-
-    # =====================================================================
-    # 7. KHÔI PHỤC HOÀN TOÀN KHU VỰC XE ĐẦU KÉO NGOÀI TRONG CA
-    # =====================================================================
-    st.write("---")
-    st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS LOG)")
-    if truck_summary:
-        for t_name, t_info in truck_summary.items():
-            with st.expander(f"🚛 XE ĐẦU KÉO NGOÀI: {t_info['vessel_name']} ➔ Sản lượng ca: {t_info['total_moves']} Lượt"):
-                st.markdown(f"* 📦 **Sản lượng quy đổi:** `{t_info['total_teus']}` TEU\n* ⏱ **Thời điểm quét cổng:** {t_info['first_move'].strftime('%H:%M')} ➔ {t_info['last_move'].strftime('%H:%M')}")
-
-# 5. ĐỒNG BỘ CUỐI CÙNG (Chỉ để duy nhất 1 lần ở cuối file)
-# =====================================================================
-# 5. PHÂN HỆ ĐIỀU PHỐI CHÍNH (TAB 1)
-# =====================================================================
-with tab_main:
-    st.subheader("🗺️ SƠ ĐỒ SỐ HÓA CẦU BẾN CMIT KÉO THẢ PHÂN LUỒNG MẠN TÀU")
-    # ... (giữ nguyên các phần chọn multiselect và logic JS cũ của bạn cho đến dòng 587) ...
-
-    # [GIỮ NGUYÊN ĐOẠN CODE HTML + JS CŨ CỦA BẠN CHO ĐẾN KẾT THÚC CỦA st.components.v1.html]
-
-    # =====================================================================
-    # 6. HIỂN THỊ DANH SÁCH CHI TIẾT & XUẤT PDF
-    # =====================================================================
-    st.subheader("📋 CHI TIẾT SÀ LAN ĐANG BIỂU DIỄN TRÊN SƠ ĐỒ")
-    
-    # (Đoạn hiển thị danh sách sà lan của bạn...)
-
-    # --- NÚT XUẤT PDF SỬ DỤNG FPDF ---
-    if st.button("🖨️ Xuất sơ đồ ra PDF (Báo cáo)"):
-        # Gọi hàm tạo PDF đã định nghĩa ở phần đầu file
-        pdf_bytes = create_pdf(js_barges_list)
+        js_barges_list = [] # (Đảm bảo list này đã được định nghĩa từ logic bên trên)
+        pdf_data = create_pdf(js_barges_list)
         st.download_button(
             label="📥 Tải file PDF báo cáo",
-            data=pdf_bytes,
+            data=pdf_data,
             file_name="CMIT_Berth_Report.pdf",
             mime="application/pdf"
         )
 
-# Tự động đồng bộ làm mới trang sau mỗi 30 giây
-st.components.v1.html(
-    "<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>",
-    height=0,
-)
+# Tự động refresh
+st.components.v1.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
