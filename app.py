@@ -448,11 +448,15 @@ with tab_main:
     # 7. KHÔI PHỤC HOÀN TOÀN KHU VỰC XE ĐẦU KÉO NGOÀI TRONG CA
     # =====================================================================
     st.write("---")
-    st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS LOG)")
+    st.subheader("🚛 KHU VỰC XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)")
+    
     if truck_summary:
-        for t_name, t_info in truck_summary.items():
-            with st.expander(f"🚛 XE ĐẦU KÉO NGOÀI: {t_info['vessel_name']} ➔ Sản lượng ca: {t_info['total_moves']} Lượt"):
-                st.markdown(f"* 📦 **Sản lượng quy đổi:** `{t_info['total_teus']}` TEU\n* ⏱ **Thời điểm quét cổng:** {t_info['first_move'].strftime('%H:%M')} ➔ {t_info['last_move'].strftime('%H:%M')}")
+        # Gom nhóm toàn bộ xe vào 1 Expander chính
+        with st.expander(f"📦 Nhấn để xem danh sách {len(truck_summary)} xe đầu kéo ngoài"):
+            for t_name, t_info in truck_summary.items():
+                st.markdown(f"**{t_info['vessel_name']}**: {t_info['total_moves']} lượt | {t_info['total_teus']} TEUs")
+    else:
+        st.info("Không có dữ liệu xe ngoài.")
 
 # Tự động đồng bộ làm mới trang sau mỗi 30 giây
 st.components.v1.html(
