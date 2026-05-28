@@ -3,19 +3,28 @@ import pandas as pd
 import datetime
 import warnings
 import json
+from fpdf import FPDF
 
-# 1. Cấu hình trang và tối ưu giao diện màn hình rộng
+# --- CẤU HÌNH ---
 warnings.filterwarnings("ignore")
-st.set_page_config(layout="wide", page_title="CMIT Berthing & Productivity Master Control")
+st.set_page_config(layout="wide", page_title="CMIT Berthing Master")
 
-st.title("🚢 CMIT - BERTH PLANNER & PERFORMANCE DASHBOARD")
-st.caption("Quản lý cầu bến CMIT - Hỗ trợ phân luồng kéo thả sà lan Cập Cầu (Inner) và Cập Mạn (Outer) chống chồng lấn")
-
-st.write(f"🔄 *Cập nhật log lúc: {datetime.datetime.now().strftime('%H:%M:%S')} (Tự động làm mới sau 30s)*")
-
-# Khởi tạo vùng lưu trữ trạng thái sà lan tự thêm mới
 if "custom_barges" not in st.session_state:
     st.session_state.custom_barges = {}
+
+st.title("🚢 CMIT - BERTH PLANNER & PERFORMANCE DASHBOARD")
+
+# --- HÀM TẠO PDF ---
+def create_pdf(barge_data):
+    pdf = FPDF(orientation='L', unit='mm', format='A4')
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 10, "BAO CAO SO DO CAU BEN CMIT", ln=True, align='C')
+    pdf.set_font("Arial", '', 12)
+    pdf.ln(10)
+    for item in barge_data:
+        pdf.cell(0, 10, f"- {item['name']}: {item['length']}m | {item['bays']} Bays | {item['position_type']}", ln=True)
+    return pdf.output(dest='S').encode('latin-1')
 
 # =====================================================================
 # 2. THANH SIDEBAR - QUẢN LÝ MÃ GIẢM TRỪ (DELAY 5X)
@@ -459,35 +468,22 @@ st.components.v1.html(
     "<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>",
     height=0,
 )
-# Logic xử lý PDF
-def create_pdf(barge_data):
-    pdf = FPDF(orientation='L', unit='mm', format='A4')
-    pdf.add_page()
-    pdf.set_font("Arial", 'B', 16)
-    pdf.cell(0, 10, "BAO CAO SO DO CAU BEN CMIT", ln=True, align='C')
-    pdf.set_font("Arial", '', 12)
-    pdf.ln(10)
-    for item in barge_data:
-        pdf.cell(0, 10, f"- {item['name']}: {item['length']}m | {item['bays']} Bays | Luồng: {item['position_type'].upper()}", ln=True)
-    return pdf.output(dest='S').encode('latin-1')
-    
-# Giao diện và Nút xuất PDF
+# --- GIAO DIỆN CHÍNH ---
 tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER", "⚙️ CONFIG"])
 
+with tab_config:
+    st.write("Cấu hình sà lan tại đây...") # Dán code cấu hình của anh vào
+
 with tab_main:
-    # ... (Phần chọn sà lan và vẽ sơ đồ JS của anh) ...
+    # Dán toàn bộ code hiển thị sơ đồ và logic kéo thả của anh vào đây
     
-    # Nút In PDF tích hợp ở cuối
-    st.markdown("---")
-    if st.button("🖨️ Xuất sơ đồ ra PDF"):
-        # Lấy lại danh sách js_barges_list từ logic của anh
-        pdf_bytes = create_pdf(js_barges_list)
-        st.download_button(
-            label="📥 Tải file PDF báo cáo",
-            data=pdf_bytes,
-            file_name="CMIT_Berth_Report.pdf",
-            mime="application/pdf"
-        )
+    # Nút xuất PDF đặt ở cuối tab_main
+    if 'js_barges_list' in locals():
+        if st.button("🖨️ Xuất sơ đồ ra PDF"):
+            pdf_data = create_pdf(js_barges_list)
+            st.download_button("📥 Tải file PDF", pdf_data, "CMIT_Report.pdf", "application/pdf")
+    else:
+        st.warning("Dữ liệu sà lan chưa sẵn sàng để xuất.")
 
 # Tự động refresh
 st.components.v1.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
