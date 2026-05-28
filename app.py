@@ -262,28 +262,34 @@ with tab_main:
             return f"{barge_name} (LOA: {info['length']}m | {info['bays']} Bays)"
         return barge_name
 
-    # Tách biệt 2 luồng chọn sà lan riêng biệt với nhãn hiển thị nâng cấp
+    # Lấy danh sách đã chọn hiện tại từ session_state để lọc động
+    current_inner = st.session_state.get("select_inner_barges", [])
+    current_outer = st.session_state.get("select_outer_barges", [])
+
+    # Tách biệt 2 luồng chọn sà lan riêng biệt với bộ lọc động loại trừ nhau hoàn toàn
     col_sel_inner, col_sel_outer = st.columns(2)
     
     with col_sel_inner:
         st.markdown("⚓ **1. Sà lan đậu CẬP CẦU (Băng Dưới):**")
+        # Luồng 1: Loại trừ các sà lan đã lỡ chọn ở luồng Cập Mạn phía ngoài
+        inner_options = [name for name in all_active_barges.keys() if name not in current_outer]
+        
         selected_inner = st.multiselect(
             "Chọn sà lan neo bến trực tiếp:",
-            options=list(all_active_barges.keys()),
-            default=list(all_active_barges.keys())[:2] if list(all_active_barges.keys()) else [],
-            format_func=format_barge_label,  # Hiển thị thông số khi xổ xuống
+            options=inner_options,
+            format_func=format_barge_label,
             key="select_inner_barges"
         )
         
     with col_sel_outer:
         st.markdown("⛓️ **2. Sà lan đậu CẬP MẠN (Băng Trên):**")
-        # Loại trừ những chiếc đã cập cầu ở trên để tránh trùng lặp
+        # Luồng 2: Loại trừ TUYỆT ĐỐI các sà lan đã được chọn ở luồng Cập Cầu trực tiếp
         outer_options = [name for name in all_active_barges.keys() if name not in selected_inner]
+        
         selected_outer = st.multiselect(
             "Chọn sà lan cập mạn phía ngoài:",
             options=outer_options,
-            default=[],
-            format_func=format_barge_label,  # Hiển thị thông số khi xổ xuống
+            format_func=format_barge_label,
             key="select_outer_barges"
         )
 
