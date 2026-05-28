@@ -149,10 +149,6 @@ def create_pdf(barge_data):
 tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER & DASHBOARD", "⚙️ CONFIG BARGE SPEC"])
 
 with tab_config:
-    st.subheader("⚙️ CẤU HÌNH THÔNG SỐ SÀ LAN")
-    tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER & DASHBOARD", "⚙️ CONFIG BARGE SPEC (NHẬP THÔNG SỐ SÀ LAN)"])
-
-with tab_config:
     st.subheader("➕ THÊM SÀ LAN MỚI NGOÀI KẾ HOẠCH CA")
     with st.form("add_new_barge_form", clear_on_submit=True):
         col_new_name, col_new_len, col_new_bay = st.columns([2, 1, 1])
