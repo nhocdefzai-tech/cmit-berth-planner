@@ -36,6 +36,7 @@ st.sidebar.subheader(f"{total_delay_mins} phút")
 # 3. ĐỌC VÀ XỬ LÝ DỮ LIỆU GỐC (TỐI ƯU HÓA)
 # =====================================================================
 # Bắt buộc khởi tạo biến trước khi đọc file
+file_path = "MoveEvent_20260526_2203.xlsx" # Đảm bảo tên file chính xác
 barge_summary = {}
 truck_summary = {}
 try:
@@ -91,7 +92,34 @@ def create_pdf(barge_data):
         pdf.cell(0, 10, f"- {item['name']}: {item['length']}m | {item['bays']} Bays | {item['position_type']}", ln=True)
     return pdf.output(dest='S').encode('latin-1')
 
+def get_js_barges_data(selected_inner, selected_outer):
+    data = []
+    # Thêm kiểm tra sự tồn tại của key trong all_active_barges
+    for name in selected_inner:
+        if name in all_active_barges:
+            info = all_active_barges[name]
+            data.append({
+                "name": info['vessel_name'], 
+                "length": info.get('length', 70), # Dùng .get() để tránh lỗi nếu thiếu thông số
+                "bays": info.get('bays', 4), 
+                "is_custom": info.get('is_custom', False), 
+                "position_type": "inner"
+            })
+            
+    for name in selected_outer:
+        if name in all_active_barges:
+            info = all_active_barges[name]
+            data.append({
+                "name": info['vessel_name'], 
+                "length": info.get('length', 70), 
+                "bays": info.get('bays', 4), 
+                "is_custom": info.get('is_custom', False), 
+                "position_type": "outer"
+            })
+    return data
+
 # 2. KHỞI TẠO TABS CHÍNH (Chỉ khai báo 1 lần)
+all_active_barges = {**barge_summary, **st.session_state.custom_barges}
 tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER & DASHBOARD", "⚙️ CONFIG BARGE SPEC"])
 
 with tab_config:
@@ -142,8 +170,6 @@ with tab_config:
             if f"bay_{b_name}" not in st.session_state: st.session_state[f"bay_{b_name}"] = 4 
             barge_summary[b_name]['bays'] = st.number_input(f"Số lượng Bay - {b_name}:", min_value=1, max_value=5, key=f"bay_{b_name}")
 
-all_active_barges = {**barge_summary, **st.session_state.custom_barges}
-
 # 4. GIAO DIỆN CHÍNH
 with tab_main:
     col_print, col_title = st.columns([1, 5])
@@ -187,7 +213,7 @@ with tab_main:
         )
 
     # Đóng gói cấu trúc dữ liệu đẩy xuống Javascript xử lý đồ họa
-    js_barges_list = []
+    js_barges_list = get_js_barges_data(selected_inner, selected_outer)
        
     # Xử lý sà lan cập cầu (Inner - Băng dưới)
     for name in selected_inner:
