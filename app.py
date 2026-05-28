@@ -222,20 +222,19 @@ with tab_main:
         selected_inner = st.multiselect(
             "Chọn sà lan neo bến trực tiếp:",
             options=list(all_active_barges.keys()),
-            default=list(all_active_barges.keys())[:2] if list(all_active_barges.keys()) else [],
-            format_func=format_barge_label,  # Hiển thị thông số khi xổ xuống
+            default=[], # Đặt là [] để không tự động chọn gì cả
+            format_func=format_barge_label,
             key="select_inner_barges"
         )
         
     with col_sel_outer:
         st.markdown("⛓️ **2. Sà lan đậu CẬP MẠN (Băng Trên):**")
-        # Loại trừ những chiếc đã cập cầu ở trên để tránh trùng lặp
         outer_options = [name for name in all_active_barges.keys() if name not in selected_inner]
         selected_outer = st.multiselect(
             "Chọn sà lan cập mạn phía ngoài:",
             options=outer_options,
-            default=[],
-            format_func=format_barge_label,  # Hiển thị thông số khi xổ xuống
+            default=[], # Đảm bảo ở đây cũng là danh sách rỗng
+            format_func=format_barge_label,
             key="select_outer_barges"
         )
 
