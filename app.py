@@ -4,7 +4,7 @@ import datetime
 import warnings
 import json
 
-# 1. --- CẤU HÌNH ---
+# --- CẤU HÌNH ---
 warnings.filterwarnings("ignore")
 st.set_page_config(layout="wide", page_title="CMIT Berthing Master")
 
@@ -12,6 +12,12 @@ if "custom_barges" not in st.session_state:
     st.session_state.custom_barges = {}
 
 st.title("🚢 CMIT - BERTH PLANNER & PERFORMANCE DASHBOARD")
+st.write(f"🔄 *Cập nhật log lúc: {datetime.datetime.now().strftime('%H:%M:%S')}")
+
+# --- PHẦN XỬ LÝ DỮ LIỆU N4 (Giữ nguyên logic của bạn) ---
+file_path = "MoveEvent_20260526_2203.xlsx"
+barge_summary = {}
+truck_summary = {}
 
 # =====================================================================
 # 2. THANH SIDEBAR - QUẢN LÝ MÃ GIẢM TRỪ (DELAY 5X)
@@ -455,21 +461,9 @@ st.components.v1.html(
     "<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>",
     height=0,
 )
-# --- GIAO DIỆN CHÍNH ---
-tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER", "⚙️ CONFIG"])
-
-with tab_config:
-    st.subheader("⚙️ CẤU HÌNH SÀ LAN")
-    # [Dán phần code cấu hình Sà lan của anh tại đây]
-
-with tab_main:
-    st.subheader("🗺️ SƠ ĐỒ KÉO THẢ PHÂN LUỒNG")
     
-    # 1. Đoạn code hiển thị multiselect và Logic js_barges_list của anh
-    # [Dán phần logic chọn Inner/Outer và tạo js_barges_list tại đây]
-
-    # 2. Hệ thống xuất PDF (Sử dụng giải pháp chụp container)
-    st.markdown("""
+# 1. Hệ thống in PDF (Chụp ảnh container)
+	st.markdown("""
         <script>
         function printBerth() {
             var printContents = document.getElementById("berth-container").innerHTML;
@@ -483,7 +477,7 @@ with tab_main:
 
     if st.button("🖨️ Xuất sơ đồ hiện tại ra PDF (In trình duyệt)"):
         st.markdown('<script>printBerth();</script>', unsafe_allow_html=True)
-        st.info("Trình duyệt sẽ mở cửa sổ in. Hãy chọn 'Lưu thành PDF' (Save as PDF).")
-        
-# Tự động refresh
+        st.info("Trình duyệt sẽ mở cửa sổ in. Hãy chọn 'Lưu thành PDF'.")
+
+# Tự động refresh trang sau 30 giây
 st.components.v1.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
