@@ -7,8 +7,10 @@ import streamlit.components.v1 as components
 from fpdf import FPDF
 
 # 1. CẤU HÌNH TRANG
+all_active_barges = {**barge_summary, **st.session_state.custom_barges}
 if "barge_summary" not in st.session_state: st.session_state.barge_summary = {}
 if "truck_summary" not in st.session_state: st.session_state.truck_summary = {}
+if "custom_barges" not in st.session_state: st.session_state.custom_barges = {}
     
 warnings.filterwarnings("ignore")
 st.set_page_config(layout="wide", page_title="CMIT Berthing Master")
@@ -94,9 +96,10 @@ if uploaded_file is not None:
             st.success("✅ Phân tích thành công!")
         else:
             st.error("File thiếu cột bắt buộc.")
-    except Exception as e:
-        st.error(f"Lỗi đọc file: {e}")
-
+except Exception as e:
+    st.error(f"Lỗi đọc file: {e}")
+barge_summary = st.session_state.barge_summary
+truck_summary = st.session_state.truck_summary
 # Hàm tạo PDF
 def create_pdf(barge_data):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
@@ -175,18 +178,24 @@ with tab_config:
                     del st.session_state.custom_barges[cb_name]
                     st.rerun()
 
-    st.write("🔹 **Danh sách sà lan từ File N4:**")
-    for b_name in barge_summary.keys():
+   st.write("🔹 **Danh sách sà lan từ File N4:**")
+    # Dùng session_state để luôn lấy dữ liệu mới nhất
+    current_barge_keys = list(st.session_state.barge_summary.keys())
+    for b_name in current_barge_keys:
         st.markdown(f"🛳️ Sà lan: **{b_name}**")
         col_l, col_b = st.columns(2)
         with col_l:
-            if f"len_{b_name}" not in st.session_state: st.session_state[f"len_{b_name}"] = 70 
-            barge_summary[b_name]['length'] = st.number_input(f"Chiều dài LOA (mét) - {b_name}:", min_value=40, max_value=120, key=f"len_{b_name}")
+            st.session_state.barge_summary[b_name]['length'] = st.number_input(
+                f"Chiều dài LOA (m) - {b_name}:", min_value=40, max_value=120, 
+                value=int(st.session_state.barge_summary[b_name].get('length', 70)), 
+                key=f"len_{b_name}"
+            )
         with col_b:
-            if f"bay_{b_name}" not in st.session_state: st.session_state[f"bay_{b_name}"] = 4 
-            barge_summary[b_name]['bays'] = st.number_input(f"Số lượng Bay - {b_name}:", min_value=1, max_value=5, key=f"bay_{b_name}")
+            st.session_state.barge_summary[b_name]['length'] = st.number_input(
+                f"Số Bay: - {b_name}:", min_value=3, max_value=5, 
+                value=int(st.session_state.barge_summary[b_name].get('length', 4)), 
+                key=f"len_{b_name}"
             
-all_active_barges = {**barge_summary, **st.session_state.custom_barges}
 # 4. GIAO DIỆN CHÍNH
 with tab_main:
     col_print, col_title = st.columns([1, 5])
