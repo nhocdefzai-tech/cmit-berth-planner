@@ -459,3 +459,29 @@ st.components.v1.html(
     "<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>",
     height=0,
 )
+from fpdf import FPDF
+
+# Hàm tạo file PDF từ dữ liệu hiện tại
+def create_pdf(barge_data):
+    pdf = FPDF(orientation='L', unit='mm', format='A4')
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    pdf.cell(0, 10, "BAO CAO SO DO CAU BEN CMIT", ln=True, align='C')
+    pdf.set_font("Arial", '', 12)
+    pdf.ln(10)
+    
+    # Liệt kê thông tin sà lan
+    for item in barge_data:
+        pdf.cell(0, 10, f"- {item['name']}: {item['length']}m | {item['bays']} Bays | Type: {item['position_type']}", ln=True)
+    
+    return pdf.output(dest='S').encode('latin-1')
+
+# Nút nhấn để tải PDF trên giao diện
+if st.button("🖨️ Xuất sơ đồ ra PDF"):
+    pdf_data = create_pdf(js_barges_list) # js_barges_list là danh sách sà lan anh đã xử lý
+    st.download_button(
+        label="📥 Tải file PDF ngay",
+        data=pdf_data,
+        file_name="CMIT_Berth_Report.pdf",
+        mime="application/pdf"
+    )
