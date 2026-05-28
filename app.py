@@ -7,6 +7,9 @@ import streamlit.components.v1 as components
 from fpdf import FPDF
 
 # 1. CẤU HÌNH TRANG
+if "barge_summary" not in st.session_state: st.session_state.barge_summary = {}
+if "truck_summary" not in st.session_state: st.session_state.truck_summary = {}
+    
 warnings.filterwarnings("ignore")
 st.set_page_config(layout="wide", page_title="CMIT Berthing Master")
 
@@ -36,19 +39,19 @@ st.sidebar.subheader(f"{total_delay_mins} phút")
 # 3. ĐỌC VÀ XỬ LÝ DỮ LIỆU GỐC (TỐI ƯU HÓA)
 # =====================================================================
 # [PHẦN ĐỌC FILE - THAY THẾ ĐOẠN CŨ CỦA BẠN]
+st.sidebar.header("📂 TẢI DỮ LIỆU LÊN")
 uploaded_file = st.sidebar.file_uploader("Chọn file Excel báo cáo:", type=["xlsx"])
-barge_summary = {}
-truck_summary = {}
 
 if uploaded_file is not None:
     try:
-        # Đọc trực tiếp từ object uploaded_file
         df_raw = pd.read_excel(uploaded_file, skiprows=4)
         df_raw.columns = df_raw.columns.str.strip()
         
-        required_cols = ['Carrier Visit', 'Time_DT', 'TEU', 'Move Kind']
-        if all(col in df_raw.columns for col in required_cols):
-            # Hàm clean giữ nguyên
+        if all(col in df_raw.columns for col in ['Carrier Visit', 'Time_DT', 'TEU', 'Move Kind']):
+            # Tạo biến tạm để lưu kết quả mới
+            new_barge = {}
+            new_truck = {}
+            
             def clean_carrier_name(name):
                 s = str(name).strip().upper()
                 while s.endswith('L') and len(s) > 4: s = s[:-1]
@@ -57,27 +60,42 @@ if uploaded_file is not None:
             for carrier, group in df_raw.groupby('Carrier Visit'):
                 norm_name = clean_carrier_name(carrier)
                 if "GATE" in norm_name or "INFO" in norm_name or pd.isna(carrier): continue
-                
+                    # Logic phân loại xe/tàu
+                # norm_name là tên đã được làm sạch
                 data_template = {
-                    "vessel_name": norm_name, "total_moves": 0, "total_teus": 0,
-                    "first_move": group['Time_DT'].min(), "last_move": group['Time_DT'].max()
+                    "vessel_name": norm_name, 
+                    "total_moves": 0, 
+                    "total_teus": 0,
+                    "first_move": group['Time_DT'].min(), 
+                    "last_move": group['Time_DT'].max()
                 }
                 
-                if norm_name[0].isdigit(): # Xe
-                    if norm_name not in truck_summary: truck_summary[norm_name] = data_template.copy()
-                    truck_summary[norm_name]['total_moves'] += len(group)
-                    truck_summary[norm_name]['total_teus'] += int(group['TEU'].sum())
-                else: # Sà lan
-                    if norm_name not in barge_summary: barge_summary[norm_name] = data_template.copy()
+                # Kiểm tra ký tự đầu tiên
+                if norm_name[0].isdigit():
+                    # XỬ LÝ XE (TRUCK)
+                    if norm_name not in new_truck:
+                        new_truck[norm_name] = data_template.copy()
+                    
+                    new_truck[norm_name]['total_moves'] += len(group)
+                    new_truck[norm_name]['total_teus'] += int(group['TEU'].sum() if 'TEU' in group.columns else 0)
+                
+                else:
+                    # XỬ LÝ SÀ LAN (BARGE)
+                    if norm_name not in new_barge:
+                        new_barge[norm_name] = data_template.copy()
+                    
+                    # Chỉ lấy các move phục vụ công việc tàu
                     moves_df = group[group['Move Kind'].isin(['Load', 'Discharge', 'Sling', 'Restow'])]
-                    barge_summary[norm_name]['total_moves'] += len(moves_df)
-                    barge_summary[norm_name]['total_teus'] += int(group['TEU'].sum())
-            
+                    new_barge[norm_name]['total_moves'] += len(moves_df)
+                    new_barge[norm_name]['total_teus'] += int(group['TEU'].sum() if 'TEU' in group.columns else 0)
+                    # CẬP NHẬT VÀO SESSION_STATE
+            st.session_state.barge_summary = new_barge
+            st.session_state.truck_summary = new_truck
             st.success("✅ Phân tích thành công!")
         else:
             st.error("File thiếu cột bắt buộc.")
     except Exception as e:
-        st.error(f"Lỗi: {e}")
+        st.error(f"Lỗi đọc file: {e}")
 
 # Hàm tạo PDF
 def create_pdf(barge_data):
