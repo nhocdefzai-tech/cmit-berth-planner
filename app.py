@@ -33,7 +33,7 @@ st.sidebar.markdown("### 📊 Tổng thời gian giảm trừ:")
 st.sidebar.subheader(f"{total_delay_mins} phút")
 
 # =====================================================================
-# 3. ĐỌC VÀ XỬ LÝ DỮ LIỆU GỐC TỪ FILE LOG N4
+# 3. ĐỌC VÀ XỬ LÝ DỮ LIỆU GỐC (ĐÃ GOM NHÓM SÀ LAN "L")
 # =====================================================================
 file_path = "MoveEvent_20260526_2203.xlsx"
 
@@ -44,9 +44,9 @@ try:
     df_raw = pd.read_excel(file_path, skiprows=4)
     df_raw.columns = df_raw.columns.str.strip()
     
+    # Xử lý TEU và Thời gian
     iso_col = next((c for c in df_raw.columns if 'ISO' in c or 'Unit Type' in c or 'Size' in c), None)
     df_raw['TEU'] = df_raw[iso_col].apply(lambda x: 1 if str(x).strip().startswith("2") else 2) if iso_col else 1.5
-    
     df_raw['Time_Clean'] = df_raw['Time Completed'].astype(str).str.replace(":", "")
     df_raw['Time_DT'] = pd.to_datetime(df_raw['Time_Clean'], format='%d-%b-%y %H%M', errors='coerce')
     df_raw = df_raw.dropna(subset=['Time_DT', 'Carrier Visit'])
@@ -55,69 +55,52 @@ try:
 
     for carrier, group in df_raw.groupby('Carrier Visit'):
         carrier_str = str(carrier).strip()
-        if "GATE" in carrier_str or "INFO" in carrier_str or pd.isna(carrier):
+        if pd.isna(carrier) or "GATE" in carrier_str or "INFO" in carrier_str:
             continue
             
-        if carrier_str[0].isdigit():
-            total_moves = len(group)
-            total_teus = int(group['TEU'].sum())
-            first_m = group['Time_DT'].min()
-            last_m = group['Time_DT'].max()
-            
-            if carrier_str in truck_summary:
-                truck_summary[carrier_str]['total_moves'] += total_moves
-                truck_summary[carrier_str]['total_teus'] += total_teus
-                truck_summary[carrier_str]['first_move'] = min(truck_summary[carrier_str]['first_move'], first_m)
-                truck_summary[carrier_str]['last_move'] = max(truck_summary[carrier_str]['last_move'], last_m)
-            else:
-                truck_summary[carrier_str] = {
-                    "vessel_name": carrier_str, "total_moves": total_moves, "total_teus": total_teus,
-                    "first_move": first_m, "last_move": last_m, "cranes": {}
-                }
-            continue
-
-        moves_df = group[group['Move Kind'].isin(['Load', 'Discharge', 'Sling', 'Restow'])]
-        if len(moves_df) == 0:
-            continue
-            
-        total_moves = len(moves_df)
-        total_teus = int(group['TEU'].sum())
-        first_m = group['Time_DT'].min()
-        last_m = group['Time_DT'].max()
+        # --- TỐI ƯU: GOM NHÓM SÀ LAN CÓ HẬU TỐ "L" ---
+        # Nếu mã có đuôi L, loại bỏ L để quy về mã gốc
+        norm_name = carrier_str[:-1] if (carrier_str.endswith('L') and len(carrier_str) > 4) else carrier_str
         
-        crane_details = {}
-        if che_col:
-            qc_moves = moves_df[moves_df[che_col].astype(str).str.startswith("QC", na=False)]
-            for qc_name, qc_group in qc_moves.groupby(che_col):
-                c_moves = len(qc_group)
-                c_first = qc_group['Time_DT'].min()
-                c_last = qc_group['Time_DT'].max()
-                c_gmph = 0.0
-                if pd.notna(c_first) and pd.notna(c_last):
-                    hours = (c_last - c_first).total_seconds() / 3600
-                    if hours > 0: c_gmph = round(c_moves / hours, 1)
-                
-                crane_details[qc_name] = {
-                    "moves": c_moves, "gmph": c_gmph,
-                    "timeline": f"{c_first.strftime('%H:%M')} ➔ {c_last.strftime('%H:%M')}"
+        # 1. Xử lý XE (Trucks) - Nếu mã bắt đầu bằng số
+        if norm_name[0].isdigit():
+            if norm_name not in truck_summary:
+                truck_summary[norm_name] = {
+                    "vessel_name": norm_name, "total_moves": 0, "total_teus": 0,
+                    "first_move": group['Time_DT'].min(), "last_move": group['Time_DT'].max()
                 }
-
-        if carrier_str in barge_summary:
-            barge_summary[carrier_str]['total_moves'] += total_moves
-            barge_summary[carrier_str]['total_teus'] += total_teus
-            barge_summary[carrier_str]['first_move'] = min(barge_summary[carrier_str]['first_move'], first_m)
-            barge_summary[carrier_str]['last_move'] = max(barge_summary[carrier_str]['last_move'], last_m)
-            for q_name, q_data in crane_details.items():
-                if q_name in barge_summary[carrier_str]['cranes']:
-                    barge_summary[carrier_str]['cranes'][q_name]['moves'] += q_data['moves']
-                else:
-                    barge_summary[carrier_str]['cranes'][q_name] = q_data
+            truck_summary[norm_name]['total_moves'] += len(group)
+            truck_summary[norm_name]['total_teus'] += int(group['TEU'].sum())
+            truck_summary[norm_name]['first_move'] = min(truck_summary[norm_name]['first_move'], group['Time_DT'].min())
+            truck_summary[norm_name]['last_move'] = max(truck_summary[norm_name]['last_move'], group['Time_DT'].max())
+        
+        # 2. Xử lý SÀ LAN (Barges)
         else:
-            barge_summary[carrier_str] = {
-                "vessel_name": carrier_str, "total_moves": total_moves, "total_teus": total_teus,
-                "first_move": first_m, "last_move": last_m, "cranes": crane_details, "is_custom": False
-            }
+            moves_df = group[group['Move Kind'].isin(['Load', 'Discharge', 'Sling', 'Restow'])]
+            if len(moves_df) == 0: continue
+            
+            if norm_name not in barge_summary:
+                barge_summary[norm_name] = {
+                    "vessel_name": norm_name, "total_moves": 0, "total_teus": 0,
+                    "first_move": group['Time_DT'].min(), "last_move": group['Time_DT'].max(),
+                    "cranes": {}, "is_custom": False
+                }
+            
+            # Cộng dồn sản lượng vào mã đã chuẩn hóa
+            barge_summary[norm_name]['total_moves'] += len(moves_df)
+            barge_summary[norm_name]['total_teus'] += int(group['TEU'].sum())
+            barge_summary[norm_name]['first_move'] = min(barge_summary[norm_name]['first_move'], group['Time_DT'].min())
+            barge_summary[norm_name]['last_move'] = max(barge_summary[norm_name]['last_move'], group['Time_DT'].max())
 
+            # Xử lý Cẩu (Cranes)
+            if che_col:
+                qc_moves = moves_df[moves_df[che_col].astype(str).str.startswith("QC", na=False)]
+                for qc_name, qc_group in qc_moves.groupby(che_col):
+                    if qc_name not in barge_summary[norm_name]['cranes']:
+                        barge_summary[norm_name]['cranes'][qc_name] = {"moves": 0}
+                    barge_summary[norm_name]['cranes'][qc_name]['moves'] += len(qc_group)
+
+    # Tính toán năng suất sau khi đã gom nhóm
     for b_info in barge_summary.values():
         g_hours = (b_info['last_move'] - b_info['first_move']).total_seconds() / 3600
         n_hours = g_hours - (total_delay_mins / 60)
@@ -130,7 +113,7 @@ try:
         t_info['nmph'] = t_info['gmph']
 
 except Exception as e:
-    st.error(f"❌ Lỗi cấu trúc hoặc xử lý tệp tin Excel: {e}")
+    st.error(f"❌ Lỗi xử lý dữ liệu: {e}")
     st.stop()
 
 # Hàm tạo PDF
