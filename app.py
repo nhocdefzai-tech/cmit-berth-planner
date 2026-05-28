@@ -416,27 +416,33 @@ with tab_main:
 
     st.components.v1.html(html_code, height=255)
 
-    # --- PHẦN BỊ MẤT: TỔNG HỢP XE NGOÀI ---
-    st.write("---")
-    st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)")
-    
-    # --- TỔNG HỢP XE NGOÀI GOM NHÓM ---
-    st.write("---")
-    st.subheader("🚛 KHU VỰC XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)")
-    
-    if truck_summary:
-        # Gom nhóm toàn bộ xe vào 1 Expander chính
-        with st.expander(f"📦 Nhấn để xem danh sách {len(truck_summary)} xe đầu kéo ngoài"):
-            for t_name, t_info in truck_summary.items():
-                st.markdown(f"**{t_info['vessel_name']}**: {t_info['total_moves']} lượt | {t_info['total_teus']} TEUs")
-    else:
-        st.info("Không có dữ liệu xe ngoài.")
+# =====================================================================
+# 7. KHÔI PHỤC HOÀN TOÀN KHU VỰC XE ĐẦU KÉO NGOÀI TRONG CA
+# =====================================================================
+st.write("---")
+st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS LOG)")
 
-    # Nút xuất PDF
-    if st.button("🖨️ Xuất sơ đồ hiện tại ra PDF"):
-        # Lưu ý: js_barges_list cần được lấy từ biến đã định nghĩa trong tab_main
-        pdf_data = create_pdf(js_barges_list)
-        st.download_button("📥 Tải file PDF báo cáo", pdf_data, "CMIT_Berth_Report.pdf", "application/pdf")
+if truck_summary:
+    # 1. Chuyển đổi dữ liệu từ dict sang danh sách để làm bảng
+    truck_data = []
+    for t_name, t_info in truck_summary.items():
+        truck_data.append({
+            "Mã Xe": t_name,
+            "Số Lượt": t_info['total_moves'],
+            "Tổng TEUs": t_info['total_teus'],
+            "Thời điểm đầu": t_info['first_move'].strftime('%H:%M'),
+            "Thời điểm cuối": t_info['last_move'].strftime('%H:%M')
+        })
+    
+    # 2. Tạo DataFrame
+    df_trucks = pd.DataFrame(truck_data)
+    
+    # 3. Hiển thị dạng bảng (use_container_width giúp bảng tự co giãn theo chiều rộng màn hình)
+    st.dataframe(df_trucks, use_container_width=True, hide_index=True)
+    
+    # Gợi ý thêm: Bạn có thể cho phép tải xuống file CSV của danh sách này
+    csv = df_trucks.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Tải danh sách xe (CSV)", csv, "danh_sach_xe.csv", "text/csv")
 
 # Tự động refresh (Đặt ở cuối cùng của file)
 components.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
