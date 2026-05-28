@@ -4,7 +4,7 @@ import datetime
 import warnings
 import json
 
-# --- CẤU HÌNH ---
+# 1. CẤU HÌNH
 warnings.filterwarnings("ignore")
 st.set_page_config(layout="wide", page_title="CMIT Berthing Master")
 
@@ -12,7 +12,7 @@ if "custom_barges" not in st.session_state:
     st.session_state.custom_barges = {}
 
 st.title("🚢 CMIT - BERTH PLANNER & PERFORMANCE DASHBOARD")
-st.write(f"🔄 *Cập nhật log lúc: {datetime.datetime.now().strftime('%H:%M:%S')}")
+st.write(f"🔄 *Cập nhật log: {datetime.datetime.now().strftime('%H:%M:%S')}")
 
 # --- PHẦN XỬ LÝ DỮ LIỆU N4 (Giữ nguyên logic của bạn) ---
 file_path = "MoveEvent_20260526_2203.xlsx"
@@ -134,7 +134,12 @@ try:
 except Exception as e:
     st.error(f"❌ Lỗi cấu trúc hoặc xử lý tệp tin Excel: {e}")
     st.stop()
+	
+# 3. GIAO DIỆN CHÍNH (TABS)
+tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER & DASHBOARD", "⚙️ CONFIG"])
 
+with tab_config:
+    st.subheader("⚙️ CẤU HÌNH SÀ LAN")
 
 # =====================================================================
 # 4. CHIA PHÂN HỆ KHÔNG GIAN TAB
@@ -190,7 +195,6 @@ with tab_config:
             barge_summary[b_name]['bays'] = st.number_input(f"Số lượng Bay - {b_name}:", min_value=1, max_value=5, key=f"bay_{b_name}")
 
 all_active_barges = {**barge_summary, **st.session_state.custom_barges}
-
 
 # =====================================================================
 # 5. PHÂN HỆ ĐIỀU PHỐI CHÍNH (TAB 1)
@@ -462,8 +466,8 @@ st.components.v1.html(
     height=0,
 )
     
-# 1. Hệ thống in PDF (Chụp ảnh container)
-	st.markdown("""
+# 1. Nút xuất PDF
+    st.markdown("""
         <script>
         function printBerth() {
             var printContents = document.getElementById("berth-container").innerHTML;
@@ -475,9 +479,8 @@ st.components.v1.html(
         </script>
     """, unsafe_allow_html=True)
 
-    if st.button("🖨️ Xuất sơ đồ hiện tại ra PDF (In trình duyệt)"):
+    if st.button("🖨️ Xuất sơ đồ hiện tại ra PDF"):
         st.markdown('<script>printBerth();</script>', unsafe_allow_html=True)
-        st.info("Trình duyệt sẽ mở cửa sổ in. Hãy chọn 'Lưu thành PDF'.")
 
 # Tự động refresh trang sau 30 giây
 st.components.v1.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
