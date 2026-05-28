@@ -37,6 +37,7 @@ st.sidebar.subheader(f"{total_delay_mins} phút")
 # =====================================================================
 # Bắt buộc khởi tạo biến trước khi đọc file
 file_path = "MoveEvent_20260526_2203.xlsx" # Đảm bảo tên file chính xác
+total_delay_mins = 0
 barge_summary = {}
 truck_summary = {}
 try:
