@@ -470,4 +470,35 @@ with tab_main:
                 st.markdown(f"* 📦 **Sản lượng quy đổi:** `{t_info['total_teus']}` TEU\n* ⏱ **Thời điểm quét cổng:** {t_info['first_move'].strftime('%H:%M')} ➔ {t_info['last_move'].strftime('%H:%M')}")
 
 # 5. ĐỒNG BỘ CUỐI CÙNG (Chỉ để duy nhất 1 lần ở cuối file)
-st.components.v1.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0))
+# =====================================================================
+# 5. PHÂN HỆ ĐIỀU PHỐI CHÍNH (TAB 1)
+# =====================================================================
+with tab_main:
+    st.subheader("🗺️ SƠ ĐỒ SỐ HÓA CẦU BẾN CMIT KÉO THẢ PHÂN LUỒNG MẠN TÀU")
+    # ... (giữ nguyên các phần chọn multiselect và logic JS cũ của bạn cho đến dòng 587) ...
+
+    # [GIỮ NGUYÊN ĐOẠN CODE HTML + JS CŨ CỦA BẠN CHO ĐẾN KẾT THÚC CỦA st.components.v1.html]
+
+    # =====================================================================
+    # 6. HIỂN THỊ DANH SÁCH CHI TIẾT & XUẤT PDF
+    # =====================================================================
+    st.subheader("📋 CHI TIẾT SÀ LAN ĐANG BIỂU DIỄN TRÊN SƠ ĐỒ")
+    
+    # (Đoạn hiển thị danh sách sà lan của bạn...)
+
+    # --- NÚT XUẤT PDF SỬ DỤNG FPDF ---
+    if st.button("🖨️ Xuất sơ đồ ra PDF (Báo cáo)"):
+        # Gọi hàm tạo PDF đã định nghĩa ở phần đầu file
+        pdf_bytes = create_pdf(js_barges_list)
+        st.download_button(
+            label="📥 Tải file PDF báo cáo",
+            data=pdf_bytes,
+            file_name="CMIT_Berth_Report.pdf",
+            mime="application/pdf"
+        )
+
+# Tự động đồng bộ làm mới trang sau mỗi 30 giây
+st.components.v1.html(
+    "<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>",
+    height=0,
+)
