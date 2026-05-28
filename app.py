@@ -18,6 +18,21 @@ st.title("🚢 CMIT - BERTH PLANNER & PERFORMANCE DASHBOARD")
 st.write(f"🔄 *Cập nhật log: {datetime.datetime.now().strftime('%H:%M:%S')}")
 
 # =====================================================================
+# 2. THANH SIDEBAR - QUẢN LÝ MÃ GIẢM TRỪ (DELAY 5X)
+# =====================================================================
+st.sidebar.header("🛠️ QUẢN LÝ MÃ GIẢM TRỪ (DELAY 5X)")
+d51_mins = st.sidebar.number_input("⏱️ Code 51 (Hatch Cover):", min_value=0, value=30, step=5)
+d52_mins = st.sidebar.number_input("⏱️ Code 52 (Scheduled Breaks):", min_value=0, value=45, step=5)
+d53_mins = st.sidebar.number_input("⏱️ Code 53 (Technical / Repairs):", min_value=0, value=15, step=5)
+d54_mins = st.sidebar.number_input("⏱️ Code 54 (Weather Delays):", min_value=0, value=0, step=5)
+d55_mins = st.sidebar.number_input("⏱️ Code 55 (Power Failure):", min_value=0, value=0, step=5)
+
+total_delay_mins = d51_mins + d52_mins + d53_mins + d54_mins + d55_mins
+
+st.sidebar.markdown("### 📊 Tổng thời gian giảm trừ:")
+st.sidebar.subheader(f"{total_delay_mins} phút")
+
+# =====================================================================
 # 3. ĐỌC VÀ XỬ LÝ DỮ LIỆU GỐC TỪ FILE LOG N4
 # =====================================================================
 file_path = "MoveEvent_20260526_2203.xlsx"
