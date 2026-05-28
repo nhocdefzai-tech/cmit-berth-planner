@@ -17,6 +17,10 @@ st.write(f"🔄 *Cập nhật log lúc: {datetime.datetime.now().strftime('%H:%M
 if "custom_barges" not in st.session_state:
     st.session_state.custom_barges = {}
 
+# Khởi tạo vùng lưu trữ tạm thời thông số LOA/Bay được điều chỉnh từ File N4 để tránh bị mất khi nạp lại vòng lặp
+if "n4_barges_config" not in st.session_state:
+    st.session_state.n4_barges_config = {}
+
 # =====================================================================
 # 2. THANH SIDEBAR - QUẢN LÝ MÃ GIẢM TRỪ (DELAY 5X)
 # =====================================================================
@@ -113,9 +117,14 @@ try:
                 else:
                     barge_summary[carrier_str]['cranes'][q_name] = q_data
         else:
+            # Khôi phục thông số chiều dài và số bay từ cấu hình chỉnh sửa (nếu có), mặc định là 70m và 4 bửng
+            saved_len = st.session_state.n4_barges_config.get(carrier_str, {}).get('length', 70)
+            saved_bay = st.session_state.n4_barges_config.get(carrier_str, {}).get('bays', 4)
+            
             barge_summary[carrier_str] = {
                 "vessel_name": carrier_str, "total_moves": total_moves, "total_teus": total_teus,
-                "first_move": first_m, "last_move": last_m, "cranes": crane_details, "is_custom": False
+                "first_move": first_m, "last_move": last_m, "cranes": crane_details, "is_custom": False,
+                "length": saved_len, "bays": saved_bay
             }
 
     for b_info in barge_summary.values():
@@ -162,30 +171,81 @@ with tab_config:
             st.success(f"✅ Đã thêm sà lan **{clean_name}** vào danh sách cấu hình!")
     
     st.markdown("---")
-    st.subheader("⚙️ CẤU HÌNH THÔNG SỐ SÀ LAN HIỆN HÀNH")
+    st.subheader("⚙️ BẢNG CẤU HÌNH THÔNG SỐ SÀ LAN HIỆN HÀNH")
     
+    # --- PHẦN 1: BẢNG SÀ LAN THỦ CÔNG ---
     if st.session_state.custom_barges:
         st.write("🔹 **Danh sách sà lan tự thêm:**")
-        for cb_name, cb_info in list(st.session_state.custom_barges.items()):
-            col_txt, col_l_cb, col_b_cb, col_del = st.columns([2, 1, 1, 0.5])
-            with col_txt: st.markdown(f"🛳️ **{cb_name}** *(Thủ công)*")
-            with col_l_cb: st.session_state.custom_barges[cb_name]['length'] = st.number_input(f"LOA (m) - {cb_name}", min_value=30, max_value=150, value=int(cb_info['length']), key=f"c_len_{cb_name}")
-            with col_b_cb: st.session_state.custom_barges[cb_name]['bays'] = st.number_input(f"Bays - {cb_name}", min_value=1, max_value=5, value=int(cb_info['bays']), key=f"c_bay_{cb_name}")
-            with col_del:
-                if st.button("🗑️ Xóa", key=f"del_{cb_name}"):
-                    del st.session_state.custom_barges[cb_name]
-                    st.rerun()
+        custom_table_data = []
+        for cb_name, cb_info in st.session_state.custom_barges.items():
+            custom_table_data.append({
+                "Tên Sà Lan (Thủ công)": cb_name,
+                "Chiều dài LOA (mét)": int(cb_info['length']),
+                "Số lượng Bay (Bays)": int(cb_info['bays']),
+            })
+        
+        df_custom_editable = pd.DataFrame(custom_table_data)
+        edited_custom_df = st.data_editor(
+            df_custom_editable,
+            use_container_width=True,
+            hide_index=True,
+            disabled=["Tên Sà Lan (Thủ công)"],
+            key="custom_barge_editor",
+            column_config={
+                "Chiều dài LOA (mét)": st.column_config.NumberColumn(min_value=30, max_value=150, step=1, format="%d m"),
+                "Số lượng Bay (Bays)": st.column_config.NumberColumn(min_value=1, max_value=5, step=1, format="%d B")
+            }
+        )
+        
+        # Đồng bộ ngược vào session_state cho sà lan thủ công
+        for _, row in edited_custom_df.iterrows():
+            name = row["Tên Sà Lan (Thủ công)"]
+            st.session_state.custom_barges[name]['length'] = row["Chiều dài LOA (mét)"]
+            st.session_state.custom_barges[name]['bays'] = row["Số lượng Bay (Bays)"]
+            
+        # Nút hỗ trợ xóa nhanh sà lan tự thêm
+        to_delete = st.multiselect("🗑️ Chọn sà lan thủ công muốn xóa hoàn toàn:", options=list(st.session_state.custom_barges.keys()))
+        if st.button("Xác nhận xóa sà lan đã chọn"):
+            for name in to_delete:
+                del st.session_state.custom_barges[name]
+            st.rerun()
 
-    st.write("🔹 **Danh sách sà lan từ File N4:**")
-    for b_name in barge_summary.keys():
-        st.markdown(f"🛳️ Sà lan: **{b_name}**")
-        col_l, col_b = st.columns(2)
-        with col_l:
-            if f"len_{b_name}" not in st.session_state: st.session_state[f"len_{b_name}"] = 70 
-            barge_summary[b_name]['length'] = st.number_input(f"Chiều dài LOA (mét) - {b_name}:", min_value=40, max_value=120, key=f"len_{b_name}")
-        with col_b:
-            if f"bay_{b_name}" not in st.session_state: st.session_state[f"bay_{b_name}"] = 4 
-            barge_summary[b_name]['bays'] = st.number_input(f"Số lượng Bay - {b_name}:", min_value=1, max_value=5, key=f"bay_{b_name}")
+    # --- PHẦN 2: BẢNG SÀ LAN TỪ FILE N4 ---
+    if barge_summary:
+        st.write("🔹 **Danh sách sà lan lấy từ File N4:**")
+        n4_table_data = []
+        for b_name, b_info in barge_summary.items():
+            n4_table_data.append({
+                "Tên Sà Lan (N4)": b_name,
+                "Chiều dài LOA (mét)": int(b_info['length']),
+                "Số lượng Bay (Bays)": int(b_info['bays']),
+                "Tổng Sản Lượng (Moves)": b_info['total_moves'],
+                "Tổng Sản Lượng (TEUs)": b_info['total_teus']
+            })
+            
+        df_n4_editable = pd.DataFrame(n4_table_data)
+        edited_n4_df = st.data_editor(
+            df_n4_editable,
+            use_container_width=True,
+            hide_index=True,
+            disabled=["Tên Sà Lan (N4)", "Tổng Sản Lượng (Moves)", "Tổng Sản Lượng (TEUs)"],
+            key="n4_barge_editor",
+            column_config={
+                "Chiều dài LOA (mét)": st.column_config.NumberColumn(min_value=40, max_value=120, step=1, format="%d m"),
+                "Số lượng Bay (Bays)": st.column_config.NumberColumn(min_value=1, max_value=5, step=1, format="%d B")
+            }
+        )
+        
+        # Lưu vết thông số và đồng bộ ngược vào hệ thống chính dữ liệu sà lan N4
+        for _, row in edited_n4_df.iterrows():
+            name = row["Tên Sà Lan (N4)"]
+            barge_summary[name]['length'] = row["Chiều dài LOA (mét)"]
+            barge_summary[name]['bays'] = row["Số lượng Bay (Bays)"]
+            # Lưu trữ lại bộ nhớ session_state để không bị reset khi trang tự reload sau 30 giây
+            st.session_state.n4_barges_config[name] = {
+                "length": row["Chiều dài LOA (mét)"],
+                "bays": row["Số lượng Bay (Bays)"]
+            }
 
 all_active_barges = {**barge_summary, **st.session_state.custom_barges}
 
@@ -448,10 +508,9 @@ with tab_main:
     # 7. KHÔI PHỤC HOÀN TOÀN KHU VỰC XE ĐẦU KÉO NGOÀI
     # =====================================================================
     st.write("---")
-    st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)")
+    st.subheader("... 🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)")
     
     if truck_summary:
-        # 1. Chuẩn bị dữ liệu dạng bảng
         truck_data = []
         for t_name, t_info in truck_summary.items():
             truck_data.append({
@@ -462,13 +521,9 @@ with tab_main:
                 "Thời điểm cuối": t_info['last_move'].strftime('%H:%M')
             })
         df_trucks = pd.DataFrame(truck_data)
-        
-        # 2. Hiển thị bảng
         st.dataframe(df_trucks, use_container_width=True, hide_index=True)
-    
-        # 3. Chọn định dạng tải về
+        
         format_choice = st.radio("Chọn định dạng file tải về:", ("CSV", "Excel"), horizontal=True, key="truck_dl_format")
-    
         if format_choice == "CSV":
             csv_data = df_trucks.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Tải xuống CSV", csv_data, "danh_sach_xe.csv", "text/csv")
