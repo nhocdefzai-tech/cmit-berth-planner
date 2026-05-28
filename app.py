@@ -96,8 +96,8 @@ if uploaded_file is not None:
             st.success("✅ Phân tích thành công!")
         else:
             st.error("File thiếu cột bắt buộc.")
-except Exception as e:
-    st.error(f"Lỗi đọc file: {e}")
+    except Exception as e:
+        st.error(f"Lỗi đọc file: {e}")
 barge_summary = st.session_state.barge_summary
 truck_summary = st.session_state.truck_summary
 # Hàm tạo PDF
