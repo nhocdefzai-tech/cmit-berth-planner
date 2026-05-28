@@ -14,7 +14,7 @@ if "custom_barges" not in st.session_state:
 st.title("🚢 CMIT - BERTH PLANNER & PERFORMANCE DASHBOARD")
 st.write(f"🔄 *Cập nhật log: {datetime.datetime.now().strftime('%H:%M:%S')}")
 
-# --- PHẦN XỬ LÝ DỮ LIỆU N4 (Giữ nguyên logic của bạn) ---
+# --- PHẦN XỬ LÝ DỮ LIỆU ---
 file_path = "MoveEvent_20260526_2203.xlsx"
 barge_summary = {}
 truck_summary = {}
@@ -134,17 +134,14 @@ try:
 except Exception as e:
     st.error(f"❌ Lỗi cấu trúc hoặc xử lý tệp tin Excel: {e}")
     st.stop()
-	
-# 3. GIAO DIỆN CHÍNH (TABS)
-tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER & DASHBOARD", "⚙️ CONFIG"])
 
+# 2. KHAI BÁO TABS DUY NHẤT
+tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER & DASHBOARD", "⚙️ CONFIG BARGE SPEC"])
+
+# 3. GIAO DIỆN CẤU HÌNH
 with tab_config:
-    st.subheader("⚙️ CẤU HÌNH SÀ LAN")
-
-# =====================================================================
-# 4. CHIA PHÂN HỆ KHÔNG GIAN TAB
-# =====================================================================
-tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER & DASHBOARD", "⚙️ CONFIG BARGE SPEC (NHẬP THÔNG SỐ SÀ LAN)"])
+    st.subheader("⚙️ CẤU HÌNH THÔNG SỐ SÀ LAN")
+    tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER & DASHBOARD", "⚙️ CONFIG BARGE SPEC (NHẬP THÔNG SỐ SÀ LAN)"])
 
 with tab_config:
     st.subheader("➕ THÊM SÀ LAN MỚI NGOÀI KẾ HOẠCH CA")
@@ -196,9 +193,7 @@ with tab_config:
 
 all_active_barges = {**barge_summary, **st.session_state.custom_barges}
 
-# =====================================================================
-# 5. PHÂN HỆ ĐIỀU PHỐI CHÍNH (TAB 1)
-# =====================================================================
+# 4. GIAO DIỆN CHÍNH
 with tab_main:
     st.subheader("🗺️ SƠ ĐỒ SỐ HÓA CẦU BẾN CMIT KÉO THẢ PHÂN LUỒNG MẠN TÀU")
     st.caption("Băng Dưới: Sà lan cập cầu bến trực tiếp (Inner) | Băng Trên: Sà lan đậu ngoài cập mạn (Outer)")
@@ -450,24 +445,7 @@ with tab_main:
     if not selected_inner and not selected_outer:
         st.info("Vui lòng lựa chọn sà lan từ hai hộp chọn phía trên để bắt đầu lập sơ đồ.")
 
-    # =====================================================================
-    # 7. KHÔI PHỤC HOÀN TOÀN KHU VỰC XE ĐẦU KÉO NGOÀI TRONG CA
-    # =====================================================================
-    st.write("---")
-    st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS LOG)")
-    if truck_summary:
-        for t_name, t_info in truck_summary.items():
-            with st.expander(f"🚛 XE ĐẦU KÉO NGOÀI: {t_info['vessel_name']} ➔ Sản lượng ca: {t_info['total_moves']} Lượt"):
-                st.markdown(f"* 📦 **Sản lượng quy đổi:** `{t_info['total_teus']}` TEU\n* ⏱ **Thời điểm quét cổng:** {t_info['first_move'].strftime('%H:%M')} ➔ {t_info['last_move'].strftime('%H:%M')}")
-
-# Tự động đồng bộ làm mới trang sau mỗi 30 giây
-st.components.v1.html(
-    "<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>",
-    height=0,
-)
-    
-# 1. Nút xuất PDF
-    st.markdown("""
+# Nút xuất PDF
         <script>
         function printBerth() {
             var printContents = document.getElementById("berth-container").innerHTML;
@@ -480,7 +458,17 @@ st.components.v1.html(
     """, unsafe_allow_html=True)
 
     if st.button("🖨️ Xuất sơ đồ hiện tại ra PDF"):
-        st.markdown('<script>printBerth();</script>', unsafe_allow_html=True)
+        st.markdown('<script>printBerth();</script>', unsafe_allow_html=True)   
 
-# Tự động refresh trang sau 30 giây
-st.components.v1.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
+    # =====================================================================
+    # 7. KHÔI PHỤC HOÀN TOÀN KHU VỰC XE ĐẦU KÉO NGOÀI TRONG CA
+    # =====================================================================
+    st.write("---")
+    st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS LOG)")
+    if truck_summary:
+        for t_name, t_info in truck_summary.items():
+            with st.expander(f"🚛 XE ĐẦU KÉO NGOÀI: {t_info['vessel_name']} ➔ Sản lượng ca: {t_info['total_moves']} Lượt"):
+                st.markdown(f"* 📦 **Sản lượng quy đổi:** `{t_info['total_teus']}` TEU\n* ⏱ **Thời điểm quét cổng:** {t_info['first_move'].strftime('%H:%M')} ➔ {t_info['last_move'].strftime('%H:%M')}")
+
+# 5. ĐỒNG BỘ CUỐI CÙNG (Chỉ để duy nhất 1 lần ở cuối file)
+st.components.v1.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0))
