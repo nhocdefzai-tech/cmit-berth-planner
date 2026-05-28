@@ -459,9 +459,7 @@ st.components.v1.html(
     "<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>",
     height=0,
 )
-from fpdf import FPDF
-
-# Hàm tạo file PDF từ dữ liệu hiện tại
+# Logic xử lý PDF
 def create_pdf(barge_data):
     pdf = FPDF(orientation='L', unit='mm', format='A4')
     pdf.add_page()
@@ -469,19 +467,27 @@ def create_pdf(barge_data):
     pdf.cell(0, 10, "BAO CAO SO DO CAU BEN CMIT", ln=True, align='C')
     pdf.set_font("Arial", '', 12)
     pdf.ln(10)
-    
-    # Liệt kê thông tin sà lan
     for item in barge_data:
-        pdf.cell(0, 10, f"- {item['name']}: {item['length']}m | {item['bays']} Bays | Type: {item['position_type']}", ln=True)
-    
+        pdf.cell(0, 10, f"- {item['name']}: {item['length']}m | {item['bays']} Bays | Luồng: {item['position_type'].upper()}", ln=True)
     return pdf.output(dest='S').encode('latin-1')
+    
+# Giao diện và Nút xuất PDF
+tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER", "⚙️ CONFIG"])
 
-# Nút nhấn để tải PDF trên giao diện
-if st.button("🖨️ Xuất sơ đồ ra PDF"):
-    pdf_data = create_pdf(js_barges_list) # js_barges_list là danh sách sà lan anh đã xử lý
-    st.download_button(
-        label="📥 Tải file PDF ngay",
-        data=pdf_data,
-        file_name="CMIT_Berth_Report.pdf",
-        mime="application/pdf"
-    )
+with tab_main:
+    # ... (Phần chọn sà lan và vẽ sơ đồ JS của anh) ...
+    
+    # Nút In PDF tích hợp ở cuối
+    st.markdown("---")
+    if st.button("🖨️ Xuất sơ đồ ra PDF"):
+        # Lấy lại danh sách js_barges_list từ logic của anh
+        pdf_bytes = create_pdf(js_barges_list)
+        st.download_button(
+            label="📥 Tải file PDF báo cáo",
+            data=pdf_bytes,
+            file_name="CMIT_Berth_Report.pdf",
+            mime="application/pdf"
+        )
+
+# Tự động refresh
+st.components.v1.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
