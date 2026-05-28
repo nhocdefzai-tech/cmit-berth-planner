@@ -3,37 +3,19 @@ import pandas as pd
 import datetime
 import warnings
 import json
+import streamlit.components.v1 as components
 from fpdf import FPDF
 
-# 1. CẤU HÌNH
+# 1. CẤU HÌNH TRANG
 warnings.filterwarnings("ignore")
 st.set_page_config(layout="wide", page_title="CMIT Berthing Master")
 
 if "custom_barges" not in st.session_state:
     st.session_state.custom_barges = {}
 
+# Tiêu đề chính (chỉ để 1 lần duy nhất ở đây)
 st.title("🚢 CMIT - BERTH PLANNER & PERFORMANCE DASHBOARD")
 st.write(f"🔄 *Cập nhật log: {datetime.datetime.now().strftime('%H:%M:%S')}")
-
-# --- PHẦN XỬ LÝ DỮ LIỆU ---
-file_path = "MoveEvent_20260526_2203.xlsx"
-barge_summary = {}
-truck_summary = {}
-
-# =====================================================================
-# 2. THANH SIDEBAR - QUẢN LÝ MÃ GIẢM TRỪ (DELAY 5X)
-# =====================================================================
-st.sidebar.header("🛠️ QUẢN LÝ MÃ GIẢM TRỪ (DELAY 5X)")
-d51_mins = st.sidebar.number_input("⏱️ Code 51 (Hatch Cover):", min_value=0, value=30, step=5)
-d52_mins = st.sidebar.number_input("⏱️ Code 52 (Scheduled Breaks):", min_value=0, value=45, step=5)
-d53_mins = st.sidebar.number_input("⏱️ Code 53 (Technical / Repairs):", min_value=0, value=15, step=5)
-d54_mins = st.sidebar.number_input("⏱️ Code 54 (Weather Delays):", min_value=0, value=0, step=5)
-d55_mins = st.sidebar.number_input("⏱️ Code 55 (Power Failure):", min_value=0, value=0, step=5)
-
-total_delay_mins = d51_mins + d52_mins + d53_mins + d54_mins + d55_mins
-
-st.sidebar.markdown("### 📊 Tổng thời gian giảm trừ:")
-st.sidebar.subheader(f"{total_delay_mins} phút")
 
 # =====================================================================
 # 3. ĐỌC VÀ XỬ LÝ DỮ LIỆU GỐC TỪ FILE LOG N4
@@ -148,7 +130,7 @@ def create_pdf(barge_data):
         pdf.cell(0, 10, f"- {item['name']}: {item['length']}m | {item['bays']} Bays | {item['position_type']}", ln=True)
     return pdf.output(dest='S').encode('latin-1')
 
-# 2. GIAO DIỆN CHÍNH
+# 2. KHỞI TẠO TABS CHÍNH (Chỉ khai báo 1 lần)
 tab_main, tab_config = st.tabs(["🗺️ BERTH PLANNER & DASHBOARD", "⚙️ CONFIG BARGE SPEC"])
 
 with tab_config:
@@ -417,16 +399,24 @@ with tab_main:
 
     st.components.v1.html(html_code, height=255)
 
-    # 3. NÚT XUẤT PDF
-    if st.button("🖨️ Xuất sơ đồ hiện tại ra PDF"):
-        js_barges_list = [] # (Đảm bảo list này đã được định nghĩa từ logic bên trên)
-        pdf_data = create_pdf(js_barges_list)
-        st.download_button(
-            label="📥 Tải file PDF báo cáo",
-            data=pdf_data,
-            file_name="CMIT_Berth_Report.pdf",
-            mime="application/pdf"
-        )
+    # --- PHẦN BỊ MẤT: TỔNG HỢP XE NGOÀI ---
+    st.write("---")
+    st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS)")
+    
+    # Hiển thị log xe ngoài từ biến truck_summary
+    if 'truck_summary' in locals() and truck_summary:
+        for t_name, t_info in truck_summary.items():
+            with st.expander(f"🚛 XE: {t_info['vessel_name']} | Sản lượng: {t_info['total_moves']} Lượt"):
+                st.write(f"- Tổng TEUs: {t_info['total_teus']}")
+                st.write(f"- Thời gian: {t_info['first_move'].strftime('%H:%M')} đến {t_info['last_move'].strftime('%H:%M')}")
+    else:
+        st.info("Không có dữ liệu xe đầu kéo ngoài trong ca hiện tại.")
 
-# Tự động refresh
-st.components.v1.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
+    # Nút xuất PDF
+    if st.button("🖨️ Xuất sơ đồ hiện tại ra PDF"):
+        # Lưu ý: js_barges_list cần được lấy từ biến đã định nghĩa trong tab_main
+        pdf_data = create_pdf(js_barges_list)
+        st.download_button("📥 Tải file PDF báo cáo", pdf_data, "CMIT_Berth_Report.pdf", "application/pdf")
+
+# Tự động refresh (Đặt ở cuối cùng của file)
+components.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
