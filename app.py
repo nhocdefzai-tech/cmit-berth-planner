@@ -422,8 +422,11 @@ with tab_main:
 st.write("---")
 st.subheader("🚛 KHU VỰC QUẢN LÝ XE ĐẦU KÉO NGOÀI (EXTERNAL TRUCKS LOG)")
 
+# =====================================================================
+# PHẦN XUẤT FILE DANH SÁCH XE (CẬP NHẬT)
+# =====================================================================
 if truck_summary:
-    # 1. Chuyển đổi dữ liệu từ dict sang danh sách để làm bảng
+    # 1. Chuẩn bị dữ liệu
     truck_data = []
     for t_name, t_info in truck_summary.items():
         truck_data.append({
@@ -433,16 +436,33 @@ if truck_summary:
             "Thời điểm đầu": t_info['first_move'].strftime('%H:%M'),
             "Thời điểm cuối": t_info['last_move'].strftime('%H:%M')
         })
-    
-    # 2. Tạo DataFrame
     df_trucks = pd.DataFrame(truck_data)
-    
-    # 3. Hiển thị dạng bảng (use_container_width giúp bảng tự co giãn theo chiều rộng màn hình)
     st.dataframe(df_trucks, use_container_width=True, hide_index=True)
-    
-    # Gợi ý thêm: Bạn có thể cho phép tải xuống file CSV của danh sách này
-    csv = df_trucks.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Tải danh sách xe (CSV)", csv, "danh_sach_xe.csv", "text/csv")
+
+    # 2. Tạo lựa chọn định dạng
+    format_choice = st.radio("Chọn định dạng file tải về:", ("CSV", "Excel"), horizontal=True)
+
+    if format_choice == "CSV":
+        csv_data = df_trucks.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Tải xuống CSV",
+            data=csv_data,
+            file_name="danh_sach_xe.csv",
+            mime="text/csv"
+        )
+    else:
+        # Cần thư viện io để lưu file Excel vào bộ nhớ
+        import io
+        buffer = io.BytesIO()
+        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+            df_trucks.to_excel(writer, index=False, sheet_name='Trucks')
+        
+        st.download_button(
+            label="📥 Tải xuống Excel",
+            data=buffer.getvalue(),
+            file_name="danh_sach_xe.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
 # Tự động refresh (Đặt ở cuối cùng của file)
 components.html("<script>setTimeout(function(){ window.location.reload(); }, 30000);</script>", height=0)
