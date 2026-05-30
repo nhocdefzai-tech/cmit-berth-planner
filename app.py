@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from html import escape
 from io import BytesIO
@@ -419,6 +420,15 @@ REQUIRED_N4_COLUMNS = [
     ("TIME OF FETCH", "Thời gian gắp hàng"),
 ]
 
+N4_CONTEXT_TIME_COLUMNS = [
+    "Time Completed",
+    "Time STS QUAY",
+    "STS Carry End Time",
+    "STS Carry Start Time",
+    "Time of Fetch",
+    "STS Yard Time",
+]
+
 
 def main() -> None:
     st.set_page_config(
@@ -428,6 +438,7 @@ def main() -> None:
         initial_sidebar_state="collapsed",
     )
     init_state()
+    apply_pending_report_context()
     inject_css()
     render_top_status()
     render_main_toolbar()
@@ -462,6 +473,7 @@ def init_state() -> None:
         "raw_data": None,
         "dashboard_data": None,
         "upload_error": "",
+        "pending_report_context": None,
         "pending_changes": [],
         "audit_logs": [],
         "delay_markers": [],
@@ -562,7 +574,7 @@ def render_main_toolbar() -> None:
             st.rerun()
     with cols[8]:
         with st.popover("⬆ UPLOAD", use_container_width=True):
-            st.caption("Chọn file dữ liệu xuất từ N4. Bước này mới lưu metadata, phần parse dữ liệu sẽ làm ở tab Data gốc.")
+            st.caption("Chọn file dữ liệu xuất từ N4. App sẽ tự đọc bảng, đồng bộ ngày/ca và cập nhật Dashboard.")
             uploaded_file = st.file_uploader(
                 "File N4",
                 accept_multiple_files=False,
@@ -604,7 +616,7 @@ def render_dashboard() -> None:
         st.markdown("</section>", unsafe_allow_html=True)
         return
 
-    dashboard = build_dashboard_bundle(df, st.session_state.report_date)
+    dashboard = build_dashboard_bundle(df, st.session_state.report_date, st.session_state.shift_code)
     st.session_state.dashboard_data = dashboard
 
     render_dashboard_header(source_label, dashboard)
@@ -744,8 +756,9 @@ def clean_column_name(value: Any) -> str:
     return " ".join(str(value).strip().split())
 
 
-def build_dashboard_bundle(df: pd.DataFrame, report_date: date) -> dict[str, Any]:
+def build_dashboard_bundle(df: pd.DataFrame, report_date: date, shift_code: str | None = None) -> dict[str, Any]:
     work = prepare_dashboard_frame(df, report_date)
+    work = filter_dashboard_shift(work, report_date, shift_code)
     total_moves = len(work)
     productive = int(work["_activity"].isin(["LOAD", "DISCHARGE"]).sum())
     vessel_moves = int(work["_type"].eq("VESSEL").sum())
@@ -791,10 +804,30 @@ def prepare_dashboard_frame(df: pd.DataFrame, report_date: date) -> pd.DataFrame
     work["_crane"] = work.apply(infer_crane_from_row, axis=1)
     time_source = get_first_available_series(work, ["Time STS QUAY", "Time Completed", "Time of Fetch"])
     work["_time"] = time_source.apply(lambda value: parse_n4_timestamp(value, report_date))
+    work[["_context_date", "_context_shift"]] = work.apply(lambda row: derive_row_report_context(row, report_date), axis=1, result_type="expand")
     work["_gap_delay"] = pd.to_numeric(get_series(work, "Gap Delay"), errors="coerce").fillna(0)
     work["_activity"] = work.apply(classify_activity, axis=1)
     work["_hour"] = work["_time"].dt.strftime("%H:00").fillna("NO TIME")
     return work
+
+
+def filter_dashboard_shift(work: pd.DataFrame, report_date: date, shift_code: str | None) -> pd.DataFrame:
+    if not shift_code or "_context_date" not in work.columns or "_context_shift" not in work.columns:
+        return work
+    mask = work["_context_date"].eq(report_date) & work["_context_shift"].eq(shift_code)
+    if not mask.any():
+        return work
+    return work.loc[mask].copy()
+
+
+def derive_row_report_context(row: pd.Series, report_date: date) -> tuple[date | None, str]:
+    ca_context = parse_ca_context_value(row.get("CA"))
+    if ca_context:
+        return ca_context
+    timestamp = row.get("_time")
+    if pd.notna(timestamp):
+        return infer_report_context_from_clock(pd.Timestamp(timestamp).to_pydatetime())
+    return None, ""
 
 
 def get_series(df: pd.DataFrame, column: str) -> pd.Series:
@@ -843,11 +876,24 @@ def parse_n4_timestamp(value: Any, report_date: date) -> pd.Timestamp:
     match = re.match(r"^(\d{1,2})/(\d{1,2}):(\d{2})$", text)
     if match:
         day, hour, minute = map(int, match.groups())
-        try:
-            return pd.Timestamp(datetime(report_date.year, report_date.month, day, hour, minute))
-        except ValueError:
-            return pd.NaT
+        compact_dt = build_compact_n4_datetime(day, hour, minute, report_date)
+        return pd.Timestamp(compact_dt) if compact_dt else pd.NaT
     return pd.to_datetime(text, errors="coerce")
+
+
+def build_compact_n4_datetime(day: int, hour: int, minute: int, anchor_date: date) -> datetime | None:
+    month_start = pd.Timestamp(date(anchor_date.year, anchor_date.month, 1))
+    candidates: list[datetime] = []
+    for month_offset in (-1, 0, 1):
+        candidate_month = month_start + pd.DateOffset(months=month_offset)
+        try:
+            candidates.append(datetime(candidate_month.year, candidate_month.month, day, hour, minute))
+        except ValueError:
+            continue
+
+    if not candidates:
+        return None
+    return min(candidates, key=lambda candidate: abs((candidate.date() - anchor_date).days))
 
 
 def calculate_gross_crane_hours(work: pd.DataFrame) -> float:
@@ -902,7 +948,7 @@ def make_delay_watch(work: pd.DataFrame) -> dict[str, Any]:
     return {
         "rows": int(len(delayed)),
         "max_gap": float(delayed["_gap_delay"].max()) if not delayed.empty else 0,
-        "manual": len(st.session_state.delay_markers),
+        "manual": len(st.session_state.get("delay_markers", [])),
         "top": top,
     }
 
@@ -1414,16 +1460,218 @@ def on_kpi_changed(label: str) -> None:
         mark_change("Cập nhật KPI target", f"{label}: {old_value} → {new_value}.")
 
 
+def is_same_uploaded_file(meta: dict[str, Any]) -> bool:
+    previous = st.session_state.get("uploaded_file_meta") or {}
+    identity_keys = ("name", "size", "type", "fingerprint")
+    return all(previous.get(key) == meta.get(key) for key in identity_keys)
+
+
+def sync_report_context_from_n4(df: pd.DataFrame, source_name: str, reason: str) -> bool:
+    context = infer_report_context_from_n4(df, st.session_state.report_date, source_name)
+    if not context:
+        return False
+
+    return queue_report_context_sync(context["date"], context["shift"], reason, context["source"])
+
+
+def queue_report_context_sync(new_date: date, new_shift: str, reason: str, source: str) -> bool:
+    if new_shift not in {"D1", "D2"}:
+        return False
+
+    st.session_state.pending_report_context = {
+        "date": new_date,
+        "shift": new_shift,
+        "reason": reason,
+        "source": source,
+    }
+    return True
+
+
+def apply_pending_report_context() -> None:
+    pending = st.session_state.get("pending_report_context")
+    if not pending:
+        return
+
+    new_date = coerce_report_date(pending.get("date"))
+    new_shift = str(pending.get("shift", "")).upper()
+    if new_date is None or new_shift not in {"D1", "D2"}:
+        st.session_state.pending_report_context = None
+        return
+
+    changed_parts = []
+    if st.session_state.report_date != new_date:
+        changed_parts.append(f"ngày {format_date(new_date)}")
+    if st.session_state.shift_code != new_shift:
+        changed_parts.append(f"ca {new_shift}")
+
+    st.session_state.report_date = new_date
+    st.session_state.report_date_widget = new_date
+    st.session_state.delay_marker_date = new_date
+    st.session_state.delay_date_widget = new_date
+    st.session_state.shift_code = new_shift
+    st.session_state.shift_code_widget = new_shift
+    st.session_state.pending_report_context = None
+
+    source = pending.get("source", "dữ liệu N4")
+    detail = ", ".join(changed_parts) if changed_parts else f"ngày/ca đã đúng theo {source}"
+    mark_change(pending.get("reason", "Đồng bộ ngày/ca"), detail)
+    add_audit_log("sync_context", f"{detail} ({source}).")
+
+
+def coerce_report_date(value: Any) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    parsed = pd.to_datetime(value, errors="coerce", dayfirst=True)
+    if pd.isna(parsed):
+        return None
+    return parsed.date()
+
+
+def infer_report_context_from_n4(
+    df: pd.DataFrame,
+    fallback_date: date | None = None,
+    source_name: str = "",
+) -> dict[str, Any] | None:
+    file_date = infer_date_from_filename(source_name)
+    file_shift = infer_shift_from_filename(source_name)
+    if file_date and file_shift:
+        if n4_context_exists_in_ca(df, file_date, file_shift):
+            return {"date": file_date, "shift": file_shift, "source": "tên file + cột CA"}
+        return {"date": file_date, "shift": file_shift, "source": "tên file upload"}
+    if file_shift:
+        ca_context_for_shift = infer_report_context_from_ca_column(df, context_shift=file_shift)
+        if ca_context_for_shift:
+            ca_context_for_shift["source"] = f"tên file ca + {ca_context_for_shift['source']}"
+            return ca_context_for_shift
+    if file_date:
+        ca_context_for_date = infer_report_context_from_ca_column(df, context_date=file_date)
+        if ca_context_for_date:
+            ca_context_for_date["source"] = f"tên file ngày + {ca_context_for_date['source']}"
+            return ca_context_for_date
+
+    ca_context = infer_report_context_from_ca_column(df)
+    if ca_context:
+        return ca_context
+
+    anchor_date = file_date or fallback_date or date.today()
+    timestamps = extract_n4_context_timestamps(df, anchor_date)
+    time_context = infer_report_context_from_timestamps(timestamps)
+    if time_context:
+        return time_context
+
+    return None
+
+
+def n4_context_exists_in_ca(df: pd.DataFrame, context_date: date, context_shift: str) -> bool:
+    column = find_n4_column(df, "CA")
+    if not column:
+        return False
+    target = (context_date, context_shift)
+    return any(parse_ca_context_value(value) == target for value in df[column].dropna())
+
+
+def infer_report_context_from_ca_column(
+    df: pd.DataFrame,
+    context_date: date | None = None,
+    context_shift: str | None = None,
+) -> dict[str, Any] | None:
+    column = find_n4_column(df, "CA")
+    if not column:
+        return None
+
+    counts: dict[tuple[date, str], int] = {}
+    for value in df[column].dropna():
+        ca_context = parse_ca_context_value(value)
+        if not ca_context:
+            continue
+        ca_date, ca_shift = ca_context
+        if context_date and ca_date != context_date:
+            continue
+        if context_shift and ca_shift != context_shift:
+            continue
+        counts[ca_context] = counts.get(ca_context, 0) + 1
+
+    if not counts:
+        return None
+
+    (best_date, best_shift), row_count = max(
+        counts.items(),
+        key=lambda item: (item[0][0], 1 if item[0][1] == "D2" else 0, item[1]),
+    )
+    return {"date": best_date, "shift": best_shift, "source": f"cột CA ({row_count:,} dòng)"}
+
+
+def parse_ca_context_value(value: Any) -> tuple[date, str] | None:
+    if value is None or pd.isna(value):
+        return None
+    text = str(value).strip().upper()
+    match = re.search(r"\b(D[12])\b\D+(\d{1,2})/(\d{1,2})/(20\d{2})", text)
+    if not match:
+        return None
+    shift, day_text, month_text, year_text = match.groups()
+    try:
+        return date(int(year_text), int(month_text), int(day_text)), shift
+    except ValueError:
+        return None
+
+
+def extract_n4_context_timestamps(df: pd.DataFrame, anchor_date: date) -> list[pd.Timestamp]:
+    for expected_column in N4_CONTEXT_TIME_COLUMNS:
+        column = find_n4_column(df, expected_column)
+        if not column:
+            continue
+
+        timestamps = []
+        for value in df[column].dropna():
+            parsed = parse_n4_timestamp(value, anchor_date)
+            if pd.notna(parsed):
+                timestamps.append(pd.Timestamp(parsed))
+        if timestamps:
+            return timestamps
+    return []
+
+
+def infer_report_context_from_timestamps(timestamps: list[pd.Timestamp]) -> dict[str, Any] | None:
+    counts: dict[tuple[date, str], int] = {}
+    for timestamp in timestamps:
+        if pd.isna(timestamp):
+            continue
+        key = infer_report_context_from_clock(timestamp.to_pydatetime())
+        counts[key] = counts.get(key, 0) + 1
+
+    if not counts:
+        return None
+
+    (best_date, best_shift), row_count = max(counts.items(), key=lambda item: item[1])
+    return {"date": best_date, "shift": best_shift, "source": f"thời gian N4 ({row_count:,} dòng)"}
+
+
+def find_n4_column(df: pd.DataFrame, expected: str) -> str | None:
+    expected_key = clean_column_name(expected).lower()
+    for column in df.columns:
+        if clean_column_name(column).lower() == expected_key:
+            return str(column)
+    return None
+
+
+def infer_shift_from_filename(filename: str) -> str | None:
+    match = re.search(r"(?:^|[^A-Z0-9])(D[12])(?:[^A-Z0-9]|$)", filename.upper())
+    return match.group(1) if match else None
+
+
 def handle_uploaded_file(uploaded_file: Any) -> None:
+    file_bytes = uploaded_file.getvalue()
     meta = {
         "name": uploaded_file.name,
         "size": int(getattr(uploaded_file, "size", 0) or 0),
         "type": getattr(uploaded_file, "type", "") or "unknown",
+        "fingerprint": hashlib.blake2b(file_bytes, digest_size=12).hexdigest(),
     }
-    if meta == st.session_state.uploaded_file_meta and st.session_state.raw_data is not None:
+    if is_same_uploaded_file(meta) and st.session_state.raw_data is not None:
         return
 
-    file_bytes = uploaded_file.getvalue()
     try:
         parsed = read_n4_file_bytes(uploaded_file.name, file_bytes)
         st.session_state.raw_data = parsed
@@ -1438,35 +1686,20 @@ def handle_uploaded_file(uploaded_file: Any) -> None:
     mark_change("Upload dữ liệu N4", f"{meta['name']} ({format_bytes(meta['size'])}, {meta['rows']:,} dòng).")
     add_audit_log("upload", f"Nhận file {meta['name']} ({format_bytes(meta['size'])}, {meta['rows']:,} dòng).")
 
-    if st.session_state.auto_shift:
-        apply_auto_report_context("Auto sau upload")
-    else:
-        inferred = infer_date_from_filename(meta["name"])
-        if inferred:
-            set_report_date(inferred, "Auto nhận ngày từ tên file upload")
+    if not st.session_state.upload_error:
+        sync_report_context_from_n4(parsed, meta["name"], "Đồng bộ ngày/ca từ dữ liệu N4")
+        st.rerun()
 
 
 def apply_auto_report_context(reason: str) -> None:
+    df, source_label = get_active_n4_data()
     uploaded = st.session_state.uploaded_file_meta
-    file_date = infer_date_from_filename(uploaded["name"]) if uploaded else None
+    source_name = uploaded["name"] if uploaded else source_label
+    if not df.empty and sync_report_context_from_n4(df, source_name, reason):
+        return
+
     inferred_date, inferred_shift = infer_report_context_from_clock(datetime.now())
-    final_date = file_date or inferred_date
-
-    changed_parts = []
-    if st.session_state.report_date != final_date:
-        st.session_state.report_date = final_date
-        st.session_state.report_date_widget = final_date
-        st.session_state.delay_marker_date = final_date
-        st.session_state.delay_date_widget = final_date
-        changed_parts.append(f"ngày {format_date(final_date)}")
-    if st.session_state.shift_code != inferred_shift:
-        st.session_state.shift_code = inferred_shift
-        st.session_state.shift_code_widget = inferred_shift
-        changed_parts.append(f"ca {inferred_shift}")
-
-    detail = ", ".join(changed_parts) if changed_parts else "ngày/ca đã đúng theo ngữ cảnh hiện tại"
-    mark_change(reason, detail)
-    add_audit_log("auto_context", detail)
+    queue_report_context_sync(inferred_date, inferred_shift, reason, "đồng hồ hệ thống")
 
 
 def set_report_date(new_date: date, reason: str) -> None:

@@ -1,5 +1,6 @@
 import py_compile
 import unittest
+from datetime import date
 from pathlib import Path
 
 
@@ -90,6 +91,98 @@ class AppShellTest(unittest.TestCase):
         source = Path("app.py").read_text(encoding="utf-8")
         self.assertIn('f\'<div class="dashboard-kpi-card {safe_color}"><div class="kpi-title">{safe_title}</div>\'', source)
         self.assertIn('f\'<div class="kpi-value">{safe_value}</div><div class="kpi-note">{safe_note}</div></div>\'', source)
+
+    def test_n4_context_sync_prefers_ca_column(self):
+        import pandas as pd
+        import app
+
+        df = pd.DataFrame(
+            {
+                "CA": ["D2 30/05/2026", "D2 30/05/2026", "D1 29/05/2026"],
+                "Time Completed": ["30/18:10", "30/18:11", "29/07:00"],
+            }
+        )
+
+        context = app.infer_report_context_from_n4(df, date(2026, 5, 28), "raw.xlsx")
+
+        self.assertEqual(date(2026, 5, 30), context["date"])
+        self.assertEqual("D2", context["shift"])
+        self.assertIn("CA", context["source"])
+
+    def test_n4_context_sync_uses_times_when_ca_missing(self):
+        import pandas as pd
+        import app
+
+        df = pd.DataFrame(
+            {
+                "Time Completed": [
+                    "2026-05-30 18:30",
+                    "2026-05-31 02:15",
+                    "2026-05-30 19:20",
+                ]
+            }
+        )
+
+        context = app.infer_report_context_from_n4(df, date(2026, 5, 28), "raw.xlsx")
+
+        self.assertEqual(date(2026, 5, 30), context["date"])
+        self.assertEqual("D2", context["shift"])
+        self.assertIn("thời gian", context["source"])
+
+    def test_n4_context_sync_prefers_explicit_filename_when_present_in_ca(self):
+        import pandas as pd
+        import app
+
+        df = pd.DataFrame(
+            {
+                "CA": ["D1 28/05/2026", "D1 28/05/2026", "D1 30/05/2026"],
+                "Time Completed": ["28/07:00", "28/07:05", "30/07:30"],
+            }
+        )
+
+        context = app.infer_report_context_from_n4(df, date(2026, 5, 28), "RawData_SHIFT_2026-05-30_D1.xlsx")
+
+        self.assertEqual(date(2026, 5, 30), context["date"])
+        self.assertEqual("D1", context["shift"])
+        self.assertIn("tên file", context["source"])
+
+    def test_n4_context_sync_uses_filename_shift_with_ca_when_date_missing(self):
+        import pandas as pd
+        import app
+
+        df = pd.DataFrame(
+            {
+                "CA": ["D2 30/05/2026", "D1 30/05/2026", "D1 29/05/2026"],
+                "Time Completed": ["30/18:10", "30/07:30", "29/07:30"],
+            }
+        )
+
+        context = app.infer_report_context_from_n4(df, date(2026, 5, 28), "RawData_D1.xlsx")
+
+        self.assertEqual(date(2026, 5, 30), context["date"])
+        self.assertEqual("D1", context["shift"])
+        self.assertIn("tên file ca", context["source"])
+
+    def test_dashboard_bundle_filters_to_selected_shift_when_ca_exists(self):
+        import pandas as pd
+        import app
+
+        df = pd.DataFrame(
+            {
+                "Unit Nbr": ["A", "B", "C"],
+                "Move Kind": ["LOAD", "DISCH", "LOAD"],
+                "Carrier Visit": ["V1", "V1", "V2"],
+                "CA": ["D1 30/05/2026", "D1 30/05/2026", "D2 30/05/2026"],
+                "LOAI PTVT": ["VESSEL", "VESSEL", "VESSEL"],
+                "STS QUAY": ["QC01", "QC01", "QC02"],
+                "Time Completed": ["30/07:00", "30/08:00", "30/19:00"],
+            }
+        )
+
+        dashboard = app.build_dashboard_bundle(df, date(2026, 5, 30), "D1")
+
+        self.assertEqual(2, dashboard["source_rows"])
+        self.assertEqual(2, dashboard["productive"])
 
 
 if __name__ == "__main__":
