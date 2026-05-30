@@ -21,6 +21,66 @@ function Write-Step($Message) {
     Write-Host "[CMIT] $Message"
 }
 
+function Test-CommandWorks($Command, $Arguments = @("--version")) {
+    try {
+        $output = & $Command @Arguments 2>&1
+        return $LASTEXITCODE -eq 0
+    }
+    catch {
+        return $false
+    }
+}
+
+function Find-PythonExecutable {
+    $candidates = @()
+    $envPython = $env:CMIT_PYTHON
+    if ($envPython) {
+        $candidates += $envPython
+    }
+
+    foreach ($name in @("python", "python3", "py")) {
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue
+        if ($cmd) {
+            $candidates += $cmd.Source
+        }
+    }
+
+    $codexPython = Join-Path $env:USERPROFILE ".cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe"
+    if (Test-Path $codexPython) {
+        $candidates += $codexPython
+    }
+
+    foreach ($candidate in ($candidates | Where-Object { $_ } | Select-Object -Unique)) {
+        if (Test-CommandWorks $candidate) {
+            return $candidate
+        }
+    }
+
+    return $null
+}
+
+function Test-VenvHealthy {
+    if (-not (Test-Path $VenvPython)) {
+        return $false
+    }
+
+    return Test-CommandWorks $VenvPython @("--version")
+}
+
+function Reset-BrokenVenv {
+    $resolvedProject = (Resolve-Path $ProjectRoot).Path
+    $resolvedVenvParent = (Resolve-Path (Split-Path -Parent $VenvDir)).Path
+    $venvName = Split-Path -Leaf $VenvDir
+    if ($resolvedVenvParent -ne $resolvedProject -or $venvName -ne ".venv") {
+        throw "Refusing to remove unexpected venv path: $VenvDir"
+    }
+
+    if (Test-Path $VenvDir) {
+        Write-Step "Removing broken virtual environment..."
+        Remove-Item -LiteralPath $VenvDir -Recurse -Force
+    }
+}
+
 function Get-ListeningProcessIds {
     $connections = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
     if (-not $connections) {
@@ -44,25 +104,27 @@ function Get-SavedProcess {
 }
 
 function Ensure-Python {
-    if (Test-Path $VenvPython) {
+    if (Test-VenvHealthy) {
         return
     }
 
-    $python = Get-Command python -ErrorAction SilentlyContinue
+    Reset-BrokenVenv
+
+    $python = Find-PythonExecutable
     if (-not $python) {
-        throw "Python is not available in PATH. Please install Python, then run this script again."
+        throw "Python is not available. Install Python, or set CMIT_PYTHON to a valid python.exe path, then run this script again."
     }
 
     Write-Step "Creating virtual environment..."
     Push-Location $ProjectRoot
     try {
-        & python -m venv .venv
+        & $python -m venv .venv
     }
     finally {
         Pop-Location
     }
 
-    if (-not (Test-Path $VenvPython)) {
+    if (-not (Test-VenvHealthy)) {
         throw "Could not create .venv. Please check your Python installation."
     }
 }

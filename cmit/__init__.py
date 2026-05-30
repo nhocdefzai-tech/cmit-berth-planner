@@ -1,2 +1,0 @@
-"""CMIT shift reporting package."""
-
