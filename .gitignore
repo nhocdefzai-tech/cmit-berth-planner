@@ -3,6 +3,7 @@
 .streamlit.pid
 __pycache__/
 *.py[cod]
+~$*.xlsx
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

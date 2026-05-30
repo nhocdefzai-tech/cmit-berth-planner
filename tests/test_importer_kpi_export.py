@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 
-from cmit.config import PROJECT_ROOT, TEMPLATE_PATH
+from cmit.config import SAMPLE_MOVE_EVENT_PATH, TEMPLATE_PATH
 from cmit.delay_codes import is_deductible_code
 from cmit.importer import normalize_move_kind, read_move_file
 from cmit.kpi import calculate_report
@@ -58,7 +58,7 @@ class ImportKpiExportTest(unittest.TestCase):
         self.assertEqual(deduct["net_hours"], 0.5)
 
     def test_import_raw_n4_and_calculate(self):
-        sample = PROJECT_ROOT / "MoveEvent_20260526_2203.xlsx"
+        sample = SAMPLE_MOVE_EVENT_PATH
         if not sample.exists():
             self.skipTest("Sample MoveEvent file is not available.")
         shift = make_shift(date(2026, 5, 26), "D1")
@@ -69,7 +69,7 @@ class ImportKpiExportTest(unittest.TestCase):
         self.assertGreaterEqual(bundle.summary_rows[0]["overall_volume"], 0)
 
     def test_export_workbook_has_required_sheets(self):
-        sample = PROJECT_ROOT / "MoveEvent_20260526_2203.xlsx"
+        sample = SAMPLE_MOVE_EVENT_PATH
         if not sample.exists():
             self.skipTest("Sample MoveEvent file is not available.")
         shift = make_shift(date(2026, 5, 26), "D1")

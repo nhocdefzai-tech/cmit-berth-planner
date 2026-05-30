@@ -7,7 +7,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from cmit.config import PROJECT_ROOT, ensure_runtime_dirs
+from cmit.config import SAMPLE_MOVE_EVENT_PATH, ensure_runtime_dirs
 from cmit.delay_codes import as_records as delay_code_records
 from cmit.delay_codes import code_options, delay_group, describe_code, is_deductible_code, normalize_code
 from cmit.email_draft import build_email_draft
@@ -85,7 +85,7 @@ def render_sidebar() -> int | None:
         work_date = st.date_input("Work date", value=date.today())
         shift_code = st.selectbox("Shift", ["D1", "D2"], index=0)
         uploaded = st.file_uploader("Upload N4 / MoveEvent / Shift workbook", type=["xlsx", "xls"])
-        sample_path = PROJECT_ROOT / "MoveEvent_20260526_2203.xlsx"
+        sample_path = SAMPLE_MOVE_EVENT_PATH
         use_sample = st.checkbox("Import sample MoveEvent file", value=False, disabled=not sample_path.exists())
         submitted = st.form_submit_button("Create / Import Shift")
 

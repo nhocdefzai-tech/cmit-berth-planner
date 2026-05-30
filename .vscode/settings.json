@@ -1,0 +1,11 @@
+{
+  "files.exclude": {
+    "**/__pycache__": true,
+    ".git": true,
+    ".logs": true,
+    ".streamlit.pid": true,
+    ".venv": true,
+    "data": true,
+    "outputs": true
+  }
+}

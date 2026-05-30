@@ -10,7 +10,7 @@ File chay chinh cua du an:
 app.py
 ```
 
-Cac thu muc `Demo/` va `Demo 2/` hien la ban thu nghiem/ban cu, khong dung lam source chinh de phat trien tiep.
+Source chinh nam o `app.py` va package `cmit/`. Cac ban thu nghiem cu da duoc gom vao `archive/legacy/` de tham khao khi can.
 
 ## Link deploy
 
@@ -139,10 +139,16 @@ App dong thoi sinh noi dung email draft de kiem tra va gui thu cong.
 File template Excel dang nam tai:
 
 ```text
-DOCS/SHIFT_REPORT_2026-05-28_D2.xlsx
+docs/SHIFT_REPORT_2026-05-28_D2.xlsx
 ```
 
-Template nay duoc dung de giu format cho cac sheet `SUMMARY REPORT`, `CRANE STATS`, `VESSEL REPORT`, `BARGE REPORT`, `VESSEL NOTES`, `EQUIPMENT BREAKDOWN`, `DATA`.
+Danh sach delay code tham khao nam tai:
+
+```text
+docs/Delay sheet- (updated 25 May 2026).xlsx
+```
+
+Template duoc dung de giu format cho cac sheet `SUMMARY REPORT`, `CRANE STATS`, `VESSEL REPORT`, `BARGE REPORT`, `VESSEL NOTES`, `EQUIPMENT BREAKDOWN`, `DATA`.
 
 ## Cau truc du an
 
@@ -151,16 +157,15 @@ E:\Learn\Python\AI
 |-- app.py
 |-- cmit/
 |-- tests/
-|-- DOCS/
-|-- MoveEvent_20260526_2203.xlsx
+|-- docs/
+|-- sample_data/
+|-- archive/
 |-- requirements.txt
 |-- packages.txt
 |-- project.ps1
 |-- project.cmd
 |-- START_PROJECT.cmd
-|-- STOP_PROJECT.cmd
-|-- Demo/
-`-- Demo 2/
+`-- STOP_PROJECT.cmd
 ```
 
 Trong do:
@@ -168,16 +173,15 @@ Trong do:
 - `app.py`: file Streamlit chinh cua du an.
 - `cmit/`: backend nghiep vu gom import N4, tinh KPI, SQLite storage, export Excel va email draft.
 - `tests/`: unit tests cho shift rules, importer, KPI va export workbook.
-- `DOCS/SHIFT_REPORT_2026-05-28_D2.xlsx`: template bao cao Excel.
-- `MoveEvent_20260526_2203.xlsx`: file du lieu log N4 mau.
+- `docs/`: template bao cao Excel va Delay Sheet goc.
+- `sample_data/`: file du lieu mau dung de test nhanh, gom `MoveEvent_20260526_2203.xlsx` va `Book1.csv`.
+- `archive/legacy/`: code thu nghiem cu tu `Demo/` va `Demo 2/` da doi ten ro rang.
 - `requirements.txt`: danh sach thu vien Python can cai.
 - `packages.txt`: file cau hinh package he thong cho Streamlit Cloud, hien dang de trong.
 - `project.ps1`: script mo/tat/restart/kiem tra du an tren local.
 - `project.cmd`: lenh wrapper de chay `project.ps1` ma khong bi chan boi PowerShell Execution Policy.
 - `START_PROJECT.cmd`: file double-click de mo du an.
 - `STOP_PROJECT.cmd`: file double-click de tat du an.
-- `Demo/`: ban demo cu.
-- `Demo 2/`: ung dung/phien ban thu nghiem khac.
 
 Thu muc runtime khong commit:
 
