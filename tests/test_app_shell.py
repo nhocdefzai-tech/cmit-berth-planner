@@ -86,6 +86,11 @@ class AppShellTest(unittest.TestCase):
         self.assertIn('f\'<div class="mix-row"><div class="mix-label"', source)
         self.assertIn('f\'<div class="dashboard-panel">{"".join(rows)}</div>\'', source)
 
+    def test_dashboard_kpi_cards_use_compact_html(self):
+        source = Path("app.py").read_text(encoding="utf-8")
+        self.assertIn('f\'<div class="dashboard-kpi-card {safe_color}"><div class="kpi-title">{safe_title}</div>\'', source)
+        self.assertIn('f\'<div class="kpi-value">{safe_value}</div><div class="kpi-note">{safe_note}</div></div>\'', source)
+
 
 if __name__ == "__main__":
     unittest.main()

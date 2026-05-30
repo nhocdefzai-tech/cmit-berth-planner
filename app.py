@@ -990,14 +990,13 @@ def render_dashboard_kpis(dashboard: dict[str, Any]) -> None:
     ]
     html = ['<div class="dashboard-kpi-grid">']
     for title, value, note, color in cards:
+        safe_title = escape(title)
+        safe_value = escape(value)
+        safe_note = escape(note)
+        safe_color = escape(color)
         html.append(
-            f"""
-            <div class="dashboard-kpi-card {color}">
-                <div class="kpi-title">{escape(title)}</div>
-                <div class="kpi-value">{escape(value)}</div>
-                <div class="kpi-note">{escape(note)}</div>
-            </div>
-            """
+            f'<div class="dashboard-kpi-card {safe_color}"><div class="kpi-title">{safe_title}</div>'
+            f'<div class="kpi-value">{safe_value}</div><div class="kpi-note">{safe_note}</div></div>'
         )
     html.append("</div>")
     st.markdown("".join(html), unsafe_allow_html=True)
