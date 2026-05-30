@@ -1,6 +1,6 @@
-# CMIT Berth Planner & Performance Dashboard
+# CMIT Shift Report Control
 
-Ung dung Streamlit ho tro quan ly cau ben CMIT, lap so do phan luong sa lan, theo doi nang suat khai thac va quan ly cac ma giam tru delay 5x.
+Ung dung Streamlit ho tro tao bao cao san luong tung ca CMIT, import log N4/MoveEvent, luu lich su ca bang SQLite, nhap tay cac chi so Gate/CHE/Vessel Notes va xuat Shift Operation Report dang Excel.
 
 ## Ban code chinh thuc
 
@@ -117,21 +117,41 @@ Sau khi chay, mo trinh duyet tai:
 http://localhost:8501
 ```
 
-## Du lieu dau vao
+## Chuc nang chinh
 
-Ung dung hien dang doc file log N4:
+- Tao hoac mo lai ca lam viec theo quy tac CMIT:
+  - `D1`: 06:00 den truoc 18:00.
+  - `D2`: 18:00 den truoc 06:00 ngay hom sau.
+- Upload file N4/MoveEvent hoac workbook co sheet `DATA`.
+- Review va chinh classification theo carrier: `VESSEL`, `BARGE`, `GATE`, `YARD`.
+- Nhap tay thong tin personnel, Gate email, HK Moves, CHE availability, delay 5x, vessel notes va equipment breakdown.
+- Xuat file:
 
 ```text
-MoveEvent_20260526_2203.xlsx
+SHIFT_REPORT_YYYY-MM-DD_D1.xlsx
+SHIFT_REPORT_YYYY-MM-DD_D2.xlsx
 ```
 
-File nay can nam cung thu muc voi `app.py`.
+App dong thoi sinh noi dung email draft de kiem tra va gui thu cong.
+
+## Template bao cao
+
+File template Excel dang nam tai:
+
+```text
+DOCS/SHIFT_REPORT_2026-05-28_D2.xlsx
+```
+
+Template nay duoc dung de giu format cho cac sheet `SUMMARY REPORT`, `CRANE STATS`, `VESSEL REPORT`, `BARGE REPORT`, `VESSEL NOTES`, `EQUIPMENT BREAKDOWN`, `DATA`.
 
 ## Cau truc du an
 
 ```text
 E:\Learn\Python\AI
 |-- app.py
+|-- cmit/
+|-- tests/
+|-- DOCS/
 |-- MoveEvent_20260526_2203.xlsx
 |-- requirements.txt
 |-- packages.txt
@@ -146,7 +166,10 @@ E:\Learn\Python\AI
 Trong do:
 
 - `app.py`: file Streamlit chinh cua du an.
-- `MoveEvent_20260526_2203.xlsx`: file du lieu log N4 dang duoc app doc.
+- `cmit/`: backend nghiep vu gom import N4, tinh KPI, SQLite storage, export Excel va email draft.
+- `tests/`: unit tests cho shift rules, importer, KPI va export workbook.
+- `DOCS/SHIFT_REPORT_2026-05-28_D2.xlsx`: template bao cao Excel.
+- `MoveEvent_20260526_2203.xlsx`: file du lieu log N4 mau.
 - `requirements.txt`: danh sach thu vien Python can cai.
 - `packages.txt`: file cau hinh package he thong cho Streamlit Cloud, hien dang de trong.
 - `project.ps1`: script mo/tat/restart/kiem tra du an tren local.
@@ -155,6 +178,20 @@ Trong do:
 - `STOP_PROJECT.cmd`: file double-click de tat du an.
 - `Demo/`: ban demo cu.
 - `Demo 2/`: ung dung/phien ban thu nghiem khac.
+
+Thu muc runtime khong commit:
+
+- `data/`: SQLite database va source files da upload.
+- `outputs/`: cac file report Excel sinh ra.
+
+## Kiem thu
+
+Chay unit tests:
+
+```powershell
+cd E:\Learn\Python\AI
+.\.venv\Scripts\python.exe -m unittest discover -v
+```
 
 ## Xu ly loi thuong gap
 
